@@ -1,25 +1,24 @@
 use std::env;
 use std::fs::File;
-use std::fs::OpenOptions;
+use std::time::Duration;
 use ymodem::xmodem;
 
 fn main() {
 
     let args: Vec<String> = env::args().collect();
-    let tty_filename = args[1].clone();
+    let tty_dev = args[1].clone();
+
+    let mut port = serialport::new(tty_dev, 115_200)
+        .timeout(Duration::from_millis(10))
+        .open().expect("Failed to open serial port");
+    let mut output_file = File::create("./flash_dump.bin")
+        .expect("Failed to open output file");
 
     // Create xmodem with 1K blocks
     let mut xmodem = xmodem::Xmodem::new();
     xmodem.block_length = xmodem::BlockLength::OneK;
 
-    let mut tty_file = OpenOptions::new()
-        .read(true)
-        .write(true)
-        .open(tty_filename)
-        .expect("Failed to open serial device"); 
-    let mut output_file = File::create("./flash_dump.bin").expect("Failed to open output file");
-
-    let buffer = xmodem
-                    .recv(&mut tty_file, &mut output_file, xmodem::Checksum::CRC16)
-                    .expect("Failed to receive xmodem transfer"); 
+    // Receive full flash copy
+    xmodem.recv(&mut port, &mut output_file, xmodem::Checksum::CRC16)
+          .expect("Failed to receive xmodem transfer"); 
 }
