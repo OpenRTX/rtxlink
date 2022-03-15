@@ -171,6 +171,7 @@ name = "rtxlink"
 version = "0.1.0"
 dependencies = [
  "serialport",
+ "thread-control",
  "ymodem",
 ]
 
@@ -190,6 +191,12 @@ dependencies = [
  "regex",
  "winapi",
 ]
+
+[[package]]
+name = "thread-control"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "22e002431352cce4e76fd6fe77d5bf1b75ff790ea790602f0579ce58641c2eea"
 
 [[package]]
 name = "void"

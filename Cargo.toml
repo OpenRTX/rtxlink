@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 serialport = "4.0.1"
 ymodem = "0.1.1"
+thread-control = "0.1.2"
