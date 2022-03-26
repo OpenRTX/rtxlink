@@ -1,4 +1,5 @@
 use std::env;
+use std::process;
 use std::fs::{File, metadata};
 use std::time::Duration;
 use std::thread;
@@ -10,9 +11,27 @@ const OUTPUT_PATH: &str = "./flash_dump.bin";
 fn main() {
 
     let args: Vec<String> = env::args().collect();
-    let tty_dev = args[1].clone();
 
-    let mut port = serialport::new(tty_dev, 115_200)
+    // Print usage information
+    if args.len() < 3 {
+        println!("rtxlink: OpenRTX Communication Protocol");
+        println!("usage: {} COMMAND SERIALPORT", args[0]);
+        println!("commands:");
+        println!(" dump                       Read the device flash and save it to flash_dump.bin");
+        println!(" flash                      Write an image to the device flash");
+        process::exit(0);
+    }
+
+    let command = args[1].clone();
+    let serial_port = args[2].clone();
+
+    if command == "dump" {
+        dump(serial_port);
+    }
+}
+
+fn dump(serial_port: String) {
+    let mut port = serialport::new(serial_port, 115_200)
         .timeout(Duration::from_millis(10))
         .open().expect("Failed to open serial port");
     let mut output_file = File::create(OUTPUT_PATH)
