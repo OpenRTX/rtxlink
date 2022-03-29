@@ -64,7 +64,7 @@ fn dump(serial_port: String) {
 
 fn flash(serial_port: String) {
     let mut port = serialport::new(serial_port, 115_200)
-        .timeout(Duration::from_millis(10))
+        .timeout(Duration::from_secs(60))
         .open().expect("Failed to open serial port");
     let mut output_file = File::open(OUTPUT_PATH)
         .expect("Failed to open input file");
@@ -84,12 +84,8 @@ fn flash(serial_port: String) {
         println!("XMODEM transfer finished");
     });
 
-    // handle.is_running() is not available yet, use it when it is released
-    // https://github.com/rust-lang/rust/issues/90470
-    while !control.is_done() {
-        println!("Sending data...");
-        thread::sleep(Duration::from_millis(1000));
-    }
+    thread::sleep(Duration::from_millis(500));
+    println!("Press PTT on the radio to start XMODEM transfer");
     // Wait for xmodem thread to finish
     handle.join().unwrap();
 }
