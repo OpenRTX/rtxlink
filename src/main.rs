@@ -10,6 +10,7 @@ fn main() {
         println!("rtxlink: OpenRTX Communication Protocol");
         println!("usage: {} COMMAND SERIALPORT", args[0]);
         println!("commands:");
+        println!(" info                       Get device info");
         println!(" dump                       Read the device flash and save it to flash_dump.bin");
         println!(" flash                      Write an image to the device flash");
         process::exit(0);
@@ -18,6 +19,7 @@ fn main() {
     let command = args[1].clone();
     let serial_port = args[2].clone();
 
-    if command == "dump" { rtxlink::dump(serial_port); }
+    if command == "info" { rtxlink::info(serial_port); }
+    else if command == "dump" { rtxlink::dump(serial_port); }
     else if command == "flash" { rtxlink::flash(serial_port); }
 }

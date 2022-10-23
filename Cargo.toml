@@ -9,3 +9,4 @@ edition = "2021"
 serialport = "4.0.1"
 ymodem = "0.1.1"
 thread-control = "0.1.2"
+slip = { version = "0.1.2", package = "simple_slip" }

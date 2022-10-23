@@ -1,10 +1,35 @@
 use std::fs::{File, metadata};
-use std::time::Duration;
 use std::thread;
+use std::time::Duration;
+use slip::encode;
 use thread_control::*;
 use ymodem::xmodem;
 
+// CAT Protocol opcodes
+const GET: u8 = 0x47; // G
+const SET: u8 = 0x53; // S
+
+// CAT Protocol IDs
+const GET_INFO_H: u8 = 0x47;
+const GET_INFO_L: u8 = 0x49;
+
 const OUTPUT_PATH: &str = "./flash_dump.bin";
+
+pub fn info(serial_port: String) {
+    let mut port = serialport::new(serial_port, 115_200)
+        .timeout(Duration::from_millis(10))
+        .open().expect("Failed to open serial port");
+
+    let cmd: Vec<u8> = vec![GET, GET_INFO_H, GET_INFO_L];
+    let encoded: Vec<u8> = encode(&cmd).unwrap();
+
+    println!("CMD:{:?} ENC:{:?}", cmd, encoded);
+
+    port.write(&encoded);
+    let mut received: Vec<u8> = vec![0; 128];
+    port.read(&mut received);
+    println!("R:{:?}", received);
+}
 
 pub fn dump(serial_port: String) {
     let mut port = serialport::new(serial_port, 115_200)
