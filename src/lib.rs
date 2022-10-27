@@ -13,8 +13,8 @@ const DATA: u8 = 0x44; // D
 const ACK:  u8 = 0x41; // A
 
 // CAT Protocol IDs
-const GET_INFO_H: u8 = 0x47;
-const GET_INFO_L: u8 = 0x49;
+const GET_INFO_H: u8 = 0x49;
+const GET_INFO_L: u8 = 0x4E;
 
 const OUTPUT_PATH: &str = "./flash_dump.bin";
 
@@ -43,7 +43,7 @@ pub fn info(serial_port: String) {
     let decoded: Vec<u8> = decode(&received).unwrap();
     match decoded[0] {
         DATA => {
-            match str::from_utf8(&decoded[1..]) {
+            match str::from_utf8(&decoded[2..]) {
                 Ok(name) => println!("OpenRTX: {name}"),
                 Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
             };
