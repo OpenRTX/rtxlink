@@ -1,7 +1,8 @@
 use std::fs::{File, metadata};
+use std::str;
 use std::thread;
 use std::time::Duration;
-use std::str;
+use byteorder::{ByteOrder, LittleEndian};
 use slip::{encode, decode};
 use thread_control::*;
 use ymodem::xmodem;
@@ -13,46 +14,63 @@ const DATA: u8 = 0x44; // D
 const ACK:  u8 = 0x41; // A
 
 // CAT Protocol IDs
-const GET_INFO_H: u8 = 0x49;
-const GET_INFO_L: u8 = 0x4E;
+const ID_INFO:   (u8, u8) = (0x49, 0x4E); // IN
+const ID_FREQRX: (u8, u8) = (0x52, 0x46); // FR
+const ID_FREQTX: (u8, u8) = (0x54, 0x46); // FT
+
+// Convert Hertz in MegaHertz
+const HZ_IN_MHZ: f32 = 1000000.0;
 
 const OUTPUT_PATH: &str = "./flash_dump.bin";
 
-pub fn info(serial_port: String) {
+fn get(serial_port: String, id: (u8, u8)) -> Vec<u8> {
     let mut port = serialport::new(serial_port, 115_200)
         .timeout(Duration::from_millis(10))
         .open().expect("Failed to open serial port");
 
-    let cmd: Vec<u8> = vec![GET, GET_INFO_H, GET_INFO_L];
+    let cmd: Vec<u8> = vec![GET, id.0, id.1];
     let encoded: Vec<u8> = encode(&cmd).unwrap();
 
-    port.write(&encoded);
+    match port.write(&encoded) {
+        Err(e) => panic!("Error while writing info request: {e:?}"),
+        Ok(v) => v
+    };
     let mut received: Vec<u8> = vec![0; 128];
     let nread = port.read(&mut received);
     match nread {
-        Ok(n) => {
-            received.resize(n, 0);
-        }
-        Err(e) => {
-            eprintln!("Error while receiving info response: {e:?}");
-            std::process::exit(-1);
-        }
-    }
+        Ok(n) => received.resize(n, 0),
+        Err(e) => panic!("Error while receiving info response: {e:?}")
+    };
 
     // Validate and print response
     let decoded: Vec<u8> = decode(&received).unwrap();
+    //println!("{:?}", received);
     match decoded[0] {
-        DATA => {
-            match str::from_utf8(&decoded[2..]) {
-                Ok(name) => println!("OpenRTX: {name}"),
-                Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
-            };
-        },
-        _ => {
-            eprintln!("Error while parsing info response");
-            std::process::exit(-1);
-        }
+        DATA => return decoded,
+        _ => panic!("Error while parsing info response"),
     }
+}
+
+pub fn info(serial_port: String) {
+    let data: Vec<u8> = get(serial_port, ID_INFO);
+    match str::from_utf8(&data[2..]) {
+        Ok(name) => println!("OpenRTX: {name}"),
+        Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
+    };
+}
+
+pub fn freqrx(serial_port: String) {
+    let data: Vec<u8> = get(serial_port, ID_FREQRX);
+    let freq: u32 = LittleEndian::read_u32(&data[2..]);
+    let freq: f32 = freq as f32 / HZ_IN_MHZ;
+    println!("Rx: {freq} MHz");
+}
+
+pub fn freqtx(serial_port: String) {
+    let data: Vec<u8> = get(serial_port, ID_FREQTX);
+    let freq: u32 = LittleEndian::read_u32(&data[2..]);
+    let freq: f32 = freq as f32 / HZ_IN_MHZ;
+    println!("Tx: {freq} MHz");
 }
 
 pub fn dump(serial_port: String) {
