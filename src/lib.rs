@@ -32,14 +32,14 @@ fn get(serial_port: String, id: (u8, u8)) -> Vec<u8> {
     let encoded: Vec<u8> = encode(&cmd).unwrap();
 
     match port.write(&encoded) {
-        Err(e) => panic!("Error while writing info request: {e:?}"),
+        Err(e) => panic!("Error while sending get request: {e:?}"),
         Ok(v) => v
     };
     let mut received: Vec<u8> = vec![0; 128];
     let nread = port.read(&mut received);
     match nread {
         Ok(n) => received.resize(n, 0),
-        Err(e) => panic!("Error while receiving info response: {e:?}")
+        Err(e) => panic!("Error while receiving data response: {e:?}")
     };
 
     // Validate and print response
@@ -51,6 +51,34 @@ fn get(serial_port: String, id: (u8, u8)) -> Vec<u8> {
     }
 }
 
+fn set(serial_port: String, id: (u8, u8), data: &[u8]) {
+    let mut port = serialport::new(serial_port, 115_200)
+        .timeout(Duration::from_millis(10))
+        .open().expect("Failed to open serial port");
+
+    let mut cmd: Vec<u8> = vec![SET, id.0, id.1];
+    cmd.push(data.len() as u8);
+    cmd.extend(data);
+    let encoded: Vec<u8> = encode(&cmd).unwrap();
+    println!("{:?}", encoded);
+
+    match port.write(&encoded) {
+        Err(e) => panic!("Error while sending set request: {e:?}"),
+        Ok(v) => v
+    };
+    let mut received: Vec<u8> = vec![0; 128];
+    let nread = port.read(&mut received);
+    match nread {
+        Ok(n) => received.resize(n, 0),
+        Err(e) => panic!("Error while receiving ACK: {e:?}")
+    };
+
+    // Validate and print response
+    let decoded: Vec<u8> = decode(&received).unwrap();
+    println!("{:?}", received);
+    // TODO: Validate ACK
+}
+
 pub fn info(serial_port: String) {
     let data: Vec<u8> = get(serial_port, ID_INFO);
     match str::from_utf8(&data[2..]) {
@@ -59,18 +87,27 @@ pub fn info(serial_port: String) {
     };
 }
 
-pub fn freqrx(serial_port: String) {
-    let data: Vec<u8> = get(serial_port, ID_FREQRX);
-    let freq: u32 = LittleEndian::read_u32(&data[2..]);
-    let freq: f32 = freq as f32 / HZ_IN_MHZ;
-    println!("Rx: {freq} MHz");
-}
-
-pub fn freqtx(serial_port: String) {
-    let data: Vec<u8> = get(serial_port, ID_FREQTX);
-    let freq: u32 = LittleEndian::read_u32(&data[2..]);
-    let freq: f32 = freq as f32 / HZ_IN_MHZ;
-    println!("Tx: {freq} MHz");
+pub fn freq(serial_port: String, data: Option<String>, is_tx: bool) {
+    let id: (u8, u8) = if is_tx { ID_FREQTX } else { ID_FREQRX };
+    // If user supplied no data print frequency, otherwise set
+    match data {
+        None => {
+            let data: Vec<u8> = get(serial_port, id);
+            let freq: u32 = LittleEndian::read_u32(&data[2..]);
+            let freq: f32 = freq as f32 / HZ_IN_MHZ;
+            match is_tx {
+                true => println!("Tx: {freq} MHz"),
+                false => println!("Rx: {freq} MHz"),
+            };
+        },
+        Some(data) => {
+            let freq: f32 = data.parse::<f32>().unwrap();
+            let freq: u32 = (freq * HZ_IN_MHZ) as u32;
+            let mut data: [u8; 4] = [0, 0, 0, 0];
+            LittleEndian::write_u32(&mut data, freq);
+            set(serial_port, id, &data);
+        },
+    };
 }
 
 pub fn dump(serial_port: String) {
