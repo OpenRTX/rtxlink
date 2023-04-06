@@ -1,6 +1,9 @@
 use std::env;
 use std::process;
 
+mod cat;
+mod fmp;
+
 fn print_usage(cmd: &String) {
     println!("rtxlink: OpenRTX Communication Protocol");
     println!("usage: {cmd} SERIALPORT COMMAND [DATA]");
@@ -26,11 +29,11 @@ fn main() {
     let data = env::args().nth(3);
 
     match &command as &str {
-        "info" => rtxlink::info(serial_port),
-        "freqrx" => rtxlink::freq(serial_port, data, false),
-        "freqtx" => rtxlink::freq(serial_port, data, true),
-        "dump" => rtxlink::dump(serial_port),
-        "flash" => rtxlink::flash(serial_port),
+        "info" => cat::info(serial_port),
+        "freqrx" => cat::freq(serial_port, data, false),
+        "freqtx" => cat::freq(serial_port, data, true),
+        "dump" => fmp::backup(serial_port),
+        "flash" => fmp::restore(serial_port),
         _ => print_usage(&args[0]),
     };
 }
