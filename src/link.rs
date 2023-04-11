@@ -102,6 +102,7 @@ impl Link {
         // Generate binary representation of frame
         let bin_frame = frame.bin();
         let encoded: Vec<u8> = encode(&bin_frame).unwrap();
+        println!("> {:x?}", &encoded);
         // Send frame down the serial port
         self.port.write(encoded.as_slice()).expect("Error in sending frame");
     }
@@ -111,6 +112,7 @@ impl Link {
     pub fn receive(&mut self) -> Result<Frame, ErrorKind> {
         let mut received: Vec<u8> = vec![0; 128];
         let nread = self.port.read(&mut received);
+        println!("< {:x?}", &received);
         match nread {
             Ok(n) => received.resize(n, 0),
             Err(e) => panic!("Error while receiving data response: {e:?}")
