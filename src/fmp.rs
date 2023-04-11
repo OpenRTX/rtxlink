@@ -1,3 +1,5 @@
+//! This module handles the File Management Protocol portion of rtxlink
+
 use std::fs::File;
 use std::fs::metadata;
 use std::thread;

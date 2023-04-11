@@ -6,8 +6,9 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-serialport = "4.0.1"
-ymodem = "0.1.1"
-thread-control = "0.1.2"
-slip = { version = "0.1.2", package = "simple_slip" }
 byteorder = "1.4.3"
+crc = "3.0.1"
+serialport = "4.0.1"
+slip = { version = "0.1.2", package = "simple_slip" }
+thread-control = "0.1.2"
+ymodem = "0.1.1"

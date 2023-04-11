@@ -1,6 +1,7 @@
 use std::env;
 use std::process;
 
+mod link;
 mod cat;
 mod fmp;
 

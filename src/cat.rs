@@ -1,13 +1,33 @@
+//! This module handles the Computer Aided Transceiver portion of rtxlink
+
 use byteorder::{ByteOrder, LittleEndian};
-use slip::{encode, decode};
 use std::str;
-use std::time::Duration;
+
+use crate::link::Link;
+use crate::link::Protocol;
+use crate::link::Frame;
 
 // CAT Protocol opcodes
-const GET:  u8 = 0x47; // G
-const SET:  u8 = 0x53; // S
-const DATA: u8 = 0x44; // D
-const _ACK:  u8 = 0x41; // A
+enum Opcode {
+    GET = 0x47, // G
+    SET = 0x53, // S
+    DATA = 0x44, // D
+    _ACK = 0x41, // A
+}
+
+impl TryFrom<u8> for Opcode {
+    type Error = ();
+
+    fn try_from(v: u8) -> Result<Self, Self::Error> {
+        match v {
+            x if x == Opcode::GET as u8 => Ok(Opcode::GET),
+            x if x == Opcode::SET as u8 => Ok(Opcode::SET),
+            x if x == Opcode::DATA as u8 => Ok(Opcode::DATA),
+            x if x == Opcode::_ACK as u8 => Ok(Opcode::_ACK),
+            _ => Err(()),
+        }
+    }
+}
 
 // CAT Protocol IDs
 const ID_INFO:   (u8, u8) = (0x49, 0x4E); // IN
@@ -18,58 +38,44 @@ const ID_FREQTX: (u8, u8) = (0x54, 0x46); // FT
 const HZ_IN_MHZ: f32 = 1000000.0;
 
 fn get(serial_port: String, id: (u8, u8)) -> Vec<u8> {
-    let mut port = serialport::new(serial_port, 115_200)
-        .timeout(Duration::from_millis(10))
-        .open().expect("Failed to open serial port");
+    let mut link = Link::new(serial_port);
 
-    let cmd: Vec<u8> = vec![GET, id.0, id.1];
-    let encoded: Vec<u8> = encode(&cmd).unwrap();
+    let cmd: Vec<u8> = vec![Opcode::GET as u8, id.0, id.1];
+    let frame = Frame{proto: Protocol::CAT, data: cmd};
+    link.send(frame);
 
-    match port.write(&encoded) {
-        Err(e) => panic!("Error while sending get request: {e:?}"),
-        Ok(v) => v
-    };
-    let mut received: Vec<u8> = vec![0; 128];
-    let nread = port.read(&mut received);
-    match nread {
-        Ok(n) => received.resize(n, 0),
-        Err(e) => panic!("Error while receiving data response: {e:?}")
-    };
-
-    // Validate and print response
-    let decoded: Vec<u8> = decode(&received).unwrap();
-    //println!("{:?}", received);
-    match decoded[0] {
-        DATA => return decoded,
-        _ => panic!("Error while parsing info response"),
+    let mut frame: Frame;
+    // Loop until we get a message of the right protocol
+    loop {
+        frame = link.receive().expect("Error while reading frame");
+        match frame.proto {
+            Protocol::CAT => break,
+            _ => (),
+        };
     }
+    let mut data = frame.data;
+    let opcode = Opcode::try_from(data[0]).expect("Opcode not implemented!");
+    match opcode {
+        Opcode::DATA => data.remove(0),
+        _ => panic!("Error while parsing info response"),
+    };
+    data
 }
 
 fn set(serial_port: String, id: (u8, u8), data: &[u8]) {
-    let mut port = serialport::new(serial_port, 115_200)
-        .timeout(Duration::from_millis(10))
-        .open().expect("Failed to open serial port");
+    let mut link = Link::new(serial_port);
 
-    let mut cmd: Vec<u8> = vec![SET, id.0, id.1];
-    cmd.push(data.len() as u8);
+    let mut cmd: Vec<u8> = vec![Opcode::SET as u8, id.0, id.1];
     cmd.extend(data);
-    let encoded: Vec<u8> = encode(&cmd).unwrap();
-    println!("{:?}", encoded);
+    let frame = Frame{proto: Protocol::CAT, data: cmd};
+    link.send(frame);
 
-    match port.write(&encoded) {
-        Err(e) => panic!("Error while sending set request: {e:?}"),
-        Ok(v) => v
+    let frame = link.receive().expect("Error in frame reception");
+    let data = match frame.proto {
+        Protocol::CAT => frame.data,
+        _ => panic!("Error: wrong protocol received"),
     };
-    let mut received: Vec<u8> = vec![0; 128];
-    let nread = port.read(&mut received);
-    match nread {
-        Ok(n) => received.resize(n, 0),
-        Err(e) => panic!("Error while receiving ACK: {e:?}")
-    };
-
-    // Validate and print response
-    let _decoded: Vec<u8> = decode(&received).unwrap();
-    println!("{:?}", received);
+    println!("{:?}", data);
     // TODO: Validate ACK
 }
 
