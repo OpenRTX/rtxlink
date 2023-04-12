@@ -25,7 +25,7 @@ The recognized protocol IDs are the following:
 
 use crc::{Crc, Algorithm};
 use serialport::SerialPort;
-use slip::{encode, decode};
+use slip::{encode, decode_packets};
 use std::convert::TryFrom;
 use std::time::Duration;
 use std::io::ErrorKind;
@@ -34,11 +34,11 @@ use std::io::ErrorKind;
 const CRC_ALGO: Algorithm<u8> = Algorithm {
     width: 8,
     poly: 0xa6,
-    init: 0xff,
+    init: 0x00,
     refin: false,
     refout: false,
     xorout: 0x00,
-    check: 0x6c,
+    check: 0x62,
     residue: 0x00
 };
 
@@ -80,7 +80,8 @@ impl Frame {
         let crc = Crc::<u8>::new(&CRC_ALGO);
         let mut digest = crc.digest();
         digest.update(bin_rep.as_slice());
-        bin_rep.push(digest.finalize());
+        let digest = digest.finalize();
+        bin_rep.push(digest);
         bin_rep
     }
 }
@@ -112,24 +113,29 @@ impl Link {
     pub fn receive(&mut self) -> Result<Frame, ErrorKind> {
         let mut received: Vec<u8> = vec![0; 128];
         let nread = self.port.read(&mut received);
-        println!("< {:x?}", &received);
         match nread {
             Ok(n) => received.resize(n, 0),
             Err(e) => panic!("Error while receiving data response: {e:?}")
         }
+        println!("> {:x?}", received);
+        received.shrink_to_fit();
 
         // Validate and print response
         // TODO: support decoding multiple and incomplete packets
-        let decoded: Vec<u8> = decode(&received).unwrap();
+        let (frames, _remainder) = decode_packets(&received);
+
         // Check CRC
         let crc = Crc::<u8>::new(&CRC_ALGO);
         let mut digest = crc.digest();
-        digest.update(decoded.as_slice());
+        digest.update(frames[0].as_slice());
         if digest.finalize() != 0x00 {
             return Err(ErrorKind::InvalidData);
         }
         // Assign correct protocol
-        let proto = Protocol::try_from(decoded[0]).expect("Protocol not implemented!");
-        Ok(Frame{proto: proto, data: decoded})
+        let proto = Protocol::try_from(frames[0][0]).expect("Protocol not implemented!");
+        // Trim proto (1 byte at beginning) and CRC (1 byte at end)
+        let data = &frames[0][1..frames[0].len() - 1];
+        let frame = Frame {proto: proto, data: Vec::from(data)};
+        Ok(frame)
     }
 }
