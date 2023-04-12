@@ -70,8 +70,8 @@ fn get(serial_port: String, id: ID) -> Vec<u8> {
     let mut link = Link::new(serial_port);
 
     let cmd: Vec<u8> = vec![Opcode::GET as u8,
-                            (id as u16 & 0xff) as u8,
-                            ((id as u16 >> 8) & 0xff) as u8];
+                            ((id as u16 >> 8) & 0xff) as u8,
+                            (id as u16 & 0xff) as u8];
     let frame = Frame{proto: Protocol::CAT, data: cmd};
     link.send(frame);
 
@@ -102,8 +102,8 @@ fn set(serial_port: String, id: ID, data: &[u8]) {
     let mut link = Link::new(serial_port);
 
     let mut cmd: Vec<u8> = vec![Opcode::SET as u8,
-                                (id as u16 & 0xff) as u8,
-                                ((id as u16 >> 8) & 0xff) as u8];
+                                ((id as u16 >> 8) & 0xff) as u8,
+                                (id as u16 & 0xff) as u8];
     cmd.extend(data);
     let frame = Frame{proto: Protocol::CAT, data: cmd};
     link.send(frame);
