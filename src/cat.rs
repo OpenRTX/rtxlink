@@ -9,10 +9,10 @@ use crate::link::Frame;
 
 // CAT Protocol opcodes
 enum Opcode {
-    GET = 0x47, // G
-    SET = 0x53, // S
+    GET  = 0x47, // G
+    SET  = 0x53, // S
     DATA = 0x44, // D
-    _ACK = 0x41, // A
+    ACK  = 0x41, // A
 }
 
 impl TryFrom<u8> for Opcode {
@@ -23,24 +23,55 @@ impl TryFrom<u8> for Opcode {
             x if x == Opcode::GET as u8 => Ok(Opcode::GET),
             x if x == Opcode::SET as u8 => Ok(Opcode::SET),
             x if x == Opcode::DATA as u8 => Ok(Opcode::DATA),
-            x if x == Opcode::_ACK as u8 => Ok(Opcode::_ACK),
+            x if x == Opcode::ACK as u8 => Ok(Opcode::ACK),
             _ => Err(()),
         }
     }
 }
 
 // CAT Protocol IDs
-const ID_INFO:   (u8, u8) = (0x49, 0x4E); // IN
-const ID_FREQRX: (u8, u8) = (0x52, 0x46); // FR
-const ID_FREQTX: (u8, u8) = (0x54, 0x46); // FT
+#[derive(Copy, Clone)]
+enum ID {
+    INFO   = 0x494E, // IN
+    FREQRX = 0x5246, // FR
+    FREQTX = 0x5446, // FT
+
+}
+
+// POSIX Errors
+#[derive(Debug)]
+enum Errno {
+    OK      = 0,    // Success
+    E2BIG   = 7,    // Argument list too long
+    EBADR   = 53,   // Invalid request descriptor
+    EBADRQC = 56,   // Invalid request code
+    EGENERIC = 255, // Generic error
+}
+
+impl TryFrom<u8> for Errno {
+    type Error = ();
+
+    fn try_from(v: u8) -> Result<Self, Self::Error> {
+        match v {
+            x if x == Errno::OK as u8 => Ok(Errno::OK),
+            x if x == Errno::E2BIG as u8 => Ok(Errno::E2BIG),
+            x if x == Errno::EBADR as u8 => Ok(Errno::EBADR),
+            x if x == Errno::EBADRQC as u8 => Ok(Errno::EBADRQC),
+            x if x == Errno::EGENERIC as u8 => Ok(Errno::EGENERIC),
+            _ => Err(()),
+        }
+    }
+}
 
 // Convert Hertz in MegaHertz
 const HZ_IN_MHZ: f32 = 1000000.0;
 
-fn get(serial_port: String, id: (u8, u8)) -> Vec<u8> {
+fn get(serial_port: String, id: ID) -> Vec<u8> {
     let mut link = Link::new(serial_port);
 
-    let cmd: Vec<u8> = vec![Opcode::GET as u8, id.0, id.1];
+    let cmd: Vec<u8> = vec![Opcode::GET as u8,
+                            (id as u16 & 0xff) as u8,
+                            ((id as u16 >> 8) & 0xff) as u8];
     let frame = Frame{proto: Protocol::CAT, data: cmd};
     link.send(frame);
 
@@ -53,19 +84,26 @@ fn get(serial_port: String, id: (u8, u8)) -> Vec<u8> {
             _ => (),
         };
     }
+    println!("{:x?}", frame.data);
     let mut data = frame.data;
     let opcode = Opcode::try_from(data[0]).expect("Opcode not implemented!");
     match opcode {
-        Opcode::DATA => data.remove(0),
+        Opcode::ACK => match data[1] {
+            0 => (),
+            status => println!("Error in GET request: {:?}", Errno::try_from(status).unwrap()),
+        }, // Error?
+        Opcode::DATA => { data.remove(0); () }, // Correct response!
         _ => panic!("Error while parsing info response"),
     };
     data
 }
 
-fn set(serial_port: String, id: (u8, u8), data: &[u8]) {
+fn set(serial_port: String, id: ID, data: &[u8]) {
     let mut link = Link::new(serial_port);
 
-    let mut cmd: Vec<u8> = vec![Opcode::SET as u8, id.0, id.1];
+    let mut cmd: Vec<u8> = vec![Opcode::SET as u8,
+                                (id as u16 & 0xff) as u8,
+                                ((id as u16 >> 8) & 0xff) as u8];
     cmd.extend(data);
     let frame = Frame{proto: Protocol::CAT, data: cmd};
     link.send(frame);
@@ -80,15 +118,15 @@ fn set(serial_port: String, id: (u8, u8), data: &[u8]) {
 }
 
 pub fn info(serial_port: String) {
-    let data: Vec<u8> = get(serial_port, ID_INFO);
-    match str::from_utf8(&data[2..]) {
+    let data: Vec<u8> = get(serial_port, ID::INFO);
+    match str::from_utf8(&data) {
         Ok(name) => println!("OpenRTX: {name}"),
         Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
     };
 }
 
 pub fn freq(serial_port: String, data: Option<String>, is_tx: bool) {
-    let id: (u8, u8) = if is_tx { ID_FREQTX } else { ID_FREQRX };
+    let id = if is_tx { ID::FREQTX } else { ID::FREQRX };
     // If user supplied no data print frequency, otherwise set
     match data {
         None => {
