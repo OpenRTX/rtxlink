@@ -7,7 +7,7 @@ use crate::link::Link;
 use crate::link::Protocol;
 use crate::link::Frame;
 
-// CAT Protocol opcodes
+/// CAT Protocol opcodes
 enum Opcode {
     GET  = 0x47, // G
     SET  = 0x53, // S
@@ -29,7 +29,7 @@ impl TryFrom<u8> for Opcode {
     }
 }
 
-// CAT Protocol IDs
+/// CAT Protocol IDs
 #[derive(Copy, Clone)]
 enum ID {
     INFO   = 0x494E, // IN
@@ -38,7 +38,7 @@ enum ID {
 
 }
 
-// POSIX Errors
+/// POSIX Errors
 #[derive(Debug)]
 enum Errno {
     OK      = 0,    // Success
@@ -63,9 +63,10 @@ impl TryFrom<u8> for Errno {
     }
 }
 
-// Convert Hertz in MegaHertz
+/// Convert Hertz in MegaHertz
 const HZ_IN_MHZ: f32 = 1000000.0;
 
+/// CAT GET request
 fn get(serial_port: String, id: ID) -> Vec<u8> {
     let mut link = Link::new(serial_port);
 
@@ -98,6 +99,7 @@ fn get(serial_port: String, id: ID) -> Vec<u8> {
     data
 }
 
+/// CAT SET request
 fn set(serial_port: String, id: ID, data: &[u8]) {
     let mut link = Link::new(serial_port);
 
@@ -117,6 +119,7 @@ fn set(serial_port: String, id: ID, data: &[u8]) {
     // TODO: Validate ACK
 }
 
+/// CAT GET radio info
 pub fn info(serial_port: String) {
     let data: Vec<u8> = get(serial_port, ID::INFO);
     match str::from_utf8(&data) {
@@ -125,19 +128,22 @@ pub fn info(serial_port: String) {
     };
 }
 
+/// CAT GET or SET radio frequency
 pub fn freq(serial_port: String, data: Option<String>, is_tx: bool) {
     let id = if is_tx { ID::FREQTX } else { ID::FREQRX };
     // If user supplied no data print frequency, otherwise set
     match data {
+        // GET
         None => {
             let data: Vec<u8> = get(serial_port, id);
-            let freq: u32 = LittleEndian::read_u32(&data[2..]);
+            let freq: u32 = LittleEndian::read_u32(&data);
             let freq: f32 = freq as f32 / HZ_IN_MHZ;
             match is_tx {
                 true => println!("Tx: {freq} MHz"),
                 false => println!("Rx: {freq} MHz"),
             };
         },
+        // SET
         Some(data) => {
             let freq: f32 = data.parse::<f32>().unwrap();
             let freq: u32 = (freq * HZ_IN_MHZ) as u32;
