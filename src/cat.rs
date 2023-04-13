@@ -64,10 +64,10 @@ impl TryFrom<u8> for Errno {
 }
 
 /// Convert Hertz in MegaHertz
-const HZ_IN_MHZ: f32 = 1000000.0;
+const HZ_IN_MHZ: f64 = 1000000.0;
 
 /// CAT GET request
-fn get(serial_port: String, id: ID) -> Vec<u8> {
+fn get(serial_port: &str, id: ID) -> Vec<u8> {
     let mut link = Link::new(serial_port);
 
     let cmd: Vec<u8> = vec![Opcode::GET as u8,
@@ -85,7 +85,6 @@ fn get(serial_port: String, id: ID) -> Vec<u8> {
             _ => (),
         };
     }
-    println!("{:x?}", frame.data);
     let mut data = frame.data;
     let opcode = Opcode::try_from(data[0]).expect("Opcode not implemented!");
     match opcode {
@@ -94,13 +93,13 @@ fn get(serial_port: String, id: ID) -> Vec<u8> {
             status => println!("Error in GET request: {:?}", Errno::try_from(status).unwrap()),
         }, // Error?
         Opcode::DATA => { data.remove(0); () }, // Correct response!
-        _ => panic!("Error while parsing info response"),
+        _ => panic!("Error while parsing GET response"),
     };
     data
 }
 
 /// CAT SET request
-fn set(serial_port: String, id: ID, data: &[u8]) {
+fn set(serial_port: &str, id: ID, data: &[u8]) {
     let mut link = Link::new(serial_port);
 
     let mut cmd: Vec<u8> = vec![Opcode::SET as u8,
@@ -110,17 +109,28 @@ fn set(serial_port: String, id: ID, data: &[u8]) {
     let frame = Frame{proto: Protocol::CAT, data: cmd};
     link.send(frame);
 
-    let frame = link.receive().expect("Error in frame reception");
-    let data = match frame.proto {
-        Protocol::CAT => frame.data,
-        _ => panic!("Error: wrong protocol received"),
+    let mut frame: Frame;
+    // Loop until we get a message of the right protocol
+    loop {
+        frame = link.receive().expect("Error while reading frame");
+        match frame.proto {
+            Protocol::CAT => break,
+            _ => (),
+        };
+    }
+    let data = frame.data;
+    let opcode = Opcode::try_from(data[0]).expect("Opcode not implemented!");
+    match opcode {
+        Opcode::ACK => match data[1] {
+            0 => (),
+            status => println!("Error in SET request: {:?}", Errno::try_from(status).unwrap()),
+        }, // Error?
+        _ => panic!("Error while parsing SET response"),
     };
-    println!("{:?}", data);
-    // TODO: Validate ACK
 }
 
 /// CAT GET radio info
-pub fn info(serial_port: String) {
+pub fn info(serial_port: &str) {
     let data: Vec<u8> = get(serial_port, ID::INFO);
     match str::from_utf8(&data) {
         Ok(name) => println!("OpenRTX: {name}"),
@@ -129,7 +139,7 @@ pub fn info(serial_port: String) {
 }
 
 /// CAT GET or SET radio frequency
-pub fn freq(serial_port: String, data: Option<String>, is_tx: bool) {
+pub fn freq(serial_port: &str, data: Option<String>, is_tx: bool) {
     let id = if is_tx { ID::FREQTX } else { ID::FREQRX };
     // If user supplied no data print frequency, otherwise set
     match data {
@@ -137,7 +147,7 @@ pub fn freq(serial_port: String, data: Option<String>, is_tx: bool) {
         None => {
             let data: Vec<u8> = get(serial_port, id);
             let freq: u32 = LittleEndian::read_u32(&data);
-            let freq: f32 = freq as f32 / HZ_IN_MHZ;
+            let freq: f64 = freq as f64 / HZ_IN_MHZ;
             match is_tx {
                 true => println!("Tx: {freq} MHz"),
                 false => println!("Rx: {freq} MHz"),
@@ -145,7 +155,7 @@ pub fn freq(serial_port: String, data: Option<String>, is_tx: bool) {
         },
         // SET
         Some(data) => {
-            let freq: f32 = data.parse::<f32>().unwrap();
+            let freq: f64 = data.parse::<f64>().unwrap();
             let freq: u32 = (freq * HZ_IN_MHZ) as u32;
             let mut data: [u8; 4] = [0, 0, 0, 0];
             LittleEndian::write_u32(&mut data, freq);

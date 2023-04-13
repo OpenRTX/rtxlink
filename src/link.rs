@@ -91,7 +91,7 @@ pub struct Link {
 }
 
 impl Link {
-    pub fn new(port: String) -> Link {
+    pub fn new(port: &str) -> Link {
         // This is the serial port used for the rtxlink connection
         Link{port: serialport::new(port, 115200).timeout(Duration::from_millis(10)).open().expect("Failed to open port")}
     }
@@ -103,7 +103,6 @@ impl Link {
         // Generate binary representation of frame
         let bin_frame = frame.bin();
         let encoded: Vec<u8> = encode(&bin_frame).unwrap();
-        println!("> {:x?}", &encoded);
         // Send frame down the serial port
         self.port.write(encoded.as_slice()).expect("Error in sending frame");
     }
@@ -117,7 +116,6 @@ impl Link {
             Ok(n) => received.resize(n, 0),
             Err(e) => panic!("Error while receiving data response: {e:?}")
         }
-        println!("> {:x?}", received);
         received.shrink_to_fit();
 
         // Validate and print response

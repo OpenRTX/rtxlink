@@ -9,7 +9,7 @@ use ymodem::xmodem;
 
 const OUTPUT_PATH: &str = "./flash_dump.bin";
 
-pub fn backup(serial_port: String) {
+pub fn backup(serial_port: &str) {
     let mut port = serialport::new(serial_port, 115_200)
         .timeout(Duration::from_millis(10))
         .open().expect("Failed to open serial port");
@@ -42,7 +42,7 @@ pub fn backup(serial_port: String) {
     handle.join().unwrap();
 }
 
-pub fn restore(serial_port: String) {
+pub fn restore(serial_port: &str) {
     let mut port = serialport::new(serial_port, 115_200)
         .timeout(Duration::from_secs(60))
         .open().expect("Failed to open serial port");

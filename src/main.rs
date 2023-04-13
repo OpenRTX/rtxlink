@@ -25,8 +25,8 @@ fn main() {
     // Print usage information
     if args.len() < 3 { print_usage(&args[0]); }
 
-    let serial_port = args[1].clone();
-    let command = args[2].clone();
+    let serial_port = &args[1];
+    let command = &args[2];
     let data = env::args().nth(3);
 
     match &command as &str {
