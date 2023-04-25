@@ -49,6 +49,31 @@ pub enum Protocol {
     XMODEM = 0x03
 }
 
+/// POSIX Errors
+#[derive(Debug)]
+pub enum Errno {
+    OK      = 0,    // Success
+    E2BIG   = 7,    // Argument list too long
+    EBADR   = 53,   // Invalid request descriptor
+    EBADRQC = 56,   // Invalid request code
+    EGENERIC = 255, // Generic error
+}
+
+impl TryFrom<u8> for Errno {
+    type Error = ();
+
+    fn try_from(v: u8) -> Result<Self, Self::Error> {
+        match v {
+            x if x == Errno::OK as u8 => Ok(Errno::OK),
+            x if x == Errno::E2BIG as u8 => Ok(Errno::E2BIG),
+            x if x == Errno::EBADR as u8 => Ok(Errno::EBADR),
+            x if x == Errno::EBADRQC as u8 => Ok(Errno::EBADRQC),
+            x if x == Errno::EGENERIC as u8 => Ok(Errno::EGENERIC),
+            _ => Err(()),
+        }
+    }
+}
+
 impl TryFrom<u8> for Protocol {
     type Error = ();
 

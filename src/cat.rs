@@ -3,9 +3,10 @@
 use byteorder::{ByteOrder, LittleEndian};
 use std::str;
 
+use crate::link::Errno;
+use crate::link::Frame;
 use crate::link::Link;
 use crate::link::Protocol;
-use crate::link::Frame;
 
 /// CAT Protocol opcodes
 enum Opcode {
@@ -38,31 +39,6 @@ enum ID {
 
 }
 
-/// POSIX Errors
-#[derive(Debug)]
-enum Errno {
-    OK      = 0,    // Success
-    E2BIG   = 7,    // Argument list too long
-    EBADR   = 53,   // Invalid request descriptor
-    EBADRQC = 56,   // Invalid request code
-    EGENERIC = 255, // Generic error
-}
-
-impl TryFrom<u8> for Errno {
-    type Error = ();
-
-    fn try_from(v: u8) -> Result<Self, Self::Error> {
-        match v {
-            x if x == Errno::OK as u8 => Ok(Errno::OK),
-            x if x == Errno::E2BIG as u8 => Ok(Errno::E2BIG),
-            x if x == Errno::EBADR as u8 => Ok(Errno::EBADR),
-            x if x == Errno::EBADRQC as u8 => Ok(Errno::EBADRQC),
-            x if x == Errno::EGENERIC as u8 => Ok(Errno::EGENERIC),
-            _ => Err(()),
-        }
-    }
-}
-
 /// Convert Hertz in MegaHertz
 const HZ_IN_MHZ: f64 = 1000000.0;
 
@@ -76,8 +52,8 @@ fn get(serial_port: &str, id: ID) -> Vec<u8> {
     let frame = Frame{proto: Protocol::CAT, data: cmd};
     link.send(frame);
 
-    let mut frame: Frame;
     // Loop until we get a message of the right protocol
+    let mut frame: Frame;
     loop {
         frame = link.receive().expect("Error while reading frame");
         match frame.proto {
@@ -130,12 +106,12 @@ fn set(serial_port: &str, id: ID, data: &[u8]) {
 }
 
 /// CAT GET radio info
-pub fn info(serial_port: &str) {
+pub fn info(serial_port: &str) -> String {
     let data: Vec<u8> = get(serial_port, ID::INFO);
     match str::from_utf8(&data) {
-        Ok(name) => println!("OpenRTX: {name}"),
+        Ok(name) => String::from(name),
         Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
-    };
+    }
 }
 
 /// CAT GET or SET radio frequency

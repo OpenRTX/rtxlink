@@ -1,22 +1,31 @@
 use std::env;
 use std::process;
+use text_colorizer::*;
 
 mod link;
 mod cat;
 mod fmp;
 
+/// Print usage information of this tool
 fn print_usage(cmd: &String) {
-    println!("rtxlink: OpenRTX Communication Protocol");
-    println!("usage: {cmd} SERIALPORT COMMAND [DATA]");
-    println!("commands:");
-    println!(" info                      Get device info");
-    println!(" freqrx                    Print receive frequency");
-    println!(" freqtx                    Print transmit frequency");
-    println!(" freqrx FREQ_MHZ           Set the receive frequency");
-    println!(" freqtx FREQ_MHZ           Set the transmit frequency");
-    println!(" dump                      Read the device flash and save it to flash_dump.bin");
-    println!(" flash                     Write an image to the device flash");
-    process::exit(0);
+    eprintln!("{}: OpenRTX Communication Protocol", "rtxlink".yellow());
+    eprintln!("{}: invalid parameters", "Error".red().bold());
+    eprintln!("Usage: {cmd} SERIALPORT COMMAND [DATA]");
+    eprintln!("commands:");
+    eprintln!(" info                      Get device info");
+    eprintln!(" freqrx                    Print receive frequency");
+    eprintln!(" freqtx                    Print transmit frequency");
+    eprintln!(" freqrx FREQ_MHZ           Set the receive frequency");
+    eprintln!(" freqtx FREQ_MHZ           Set the transmit frequency");
+    eprintln!(" dump                      Read the device flash and save it to flash_dump.bin");
+    eprintln!(" flash                     Write an image to the device flash");
+    process::exit(1);
+}
+
+/// Print info about the target OpenRTX platform
+fn print_info(serial_port: &str) {
+    println!("Radio identifier: {}", cat::info(serial_port));
+    println!("Available memories: {}", fmp::meminfo(serial_port));
 }
 
 fn main() {
@@ -30,11 +39,11 @@ fn main() {
     let data = env::args().nth(3);
 
     match &command as &str {
-        "info" => cat::info(serial_port),
+        "info" => print_info(serial_port),
         "freqrx" => cat::freq(serial_port, data, false),
         "freqtx" => cat::freq(serial_port, data, true),
-        "dump" => fmp::backup(serial_port),
-        "flash" => fmp::restore(serial_port),
+        "backup" => fmp::backup(serial_port),
+        "restore" => fmp::restore(serial_port),
         _ => print_usage(&args[0]),
     };
 }
