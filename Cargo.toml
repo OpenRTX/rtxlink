@@ -10,5 +10,6 @@ byteorder = "1"
 crc = "3"
 serialport = "4"
 slip = { version = "0", package = "simple_slip" }
+text-colorizer = "1"
 thread-control = "0"
 ymodem = "0"
