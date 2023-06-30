@@ -1,7 +1,9 @@
 //! This module handles the File Management Protocol portion of rtxlink
 
+use std::fmt;
 use std::fs::File;
 use std::fs::metadata;
+use std::str;
 use std::thread;
 use std::time::Duration;
 use text_colorizer::*;
@@ -54,12 +56,21 @@ impl TryFrom<u8> for Opcode {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
-#[repr(C, packed)]
+#[repr(C)]
 pub struct MemInfo {
-    size: u32,
-    name: [u8; 22],
-    index: u8,
+    size: u32,      // Size of the memory in Bytes
+    name: [u8; 24], // Name of the memory
+    index: u32,     // Index for referencing this memory with FMP commands
+}
+
+impl fmt::Debug for MemInfo {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f,
+               "Index: {}, Name: {}, Size: {}",
+               self.index,
+               str::from_utf8(&self.name).unwrap(),
+               self.size)
+    }
 }
 
 /// This function sends an FMP command
@@ -100,7 +111,21 @@ pub fn wait_reply(serial_port: &str, opcode: Opcode) -> Vec<Vec<u8>> {
         status => println!("{}: {:?}", "Error".bold().red(), Errno::try_from(status).unwrap()),
     }
     // Extract parameters
-    vec![]
+    let nparams = frame.data[2] as usize;
+    let mut params = Vec::new();
+    let mut prev_params: usize = 0;
+    for _i in 0..nparams {
+        // Keep track of the offset
+        let param_size: usize = frame.data[3 + _i] as usize;
+        let mut param = Vec::with_capacity(param_size);
+        // Skip FMP header, param sizes and previous params
+        for j in 3 + nparams + prev_params..3 + nparams + prev_params + param_size {
+            param.push(frame.data[j]);
+        }
+        params.push(param);
+        prev_params += param_size;
+    }
+    params
 }
 
 pub fn _xmodem_recv(_serial_port: &str, _output_file: &str) {
@@ -135,10 +160,14 @@ pub fn _xmodem_recv(_serial_port: &str, _output_file: &str) {
 pub fn meminfo(serial_port: &str) -> String {
     send_cmd(serial_port, Opcode::MEMINFO, vec![]);
     // Receive MEMINFO response
-    let data = wait_reply(serial_port, Opcode::MEMINFO);
-    let (_, meminfo, _) = unsafe { data.align_to::<MemInfo>() };
+    let available_mem = wait_reply(serial_port, Opcode::MEMINFO);
+    let mut memlist = String::from("\n");
+    for mem in available_mem {
+        let (_, m, _) = unsafe { mem.align_to::<MemInfo>() };
+        memlist.push_str(&format!("- {:?}\n", m));
+    }
     // Return MEMINFO response
-    format!("{:?}", meminfo)
+    memlist
 }
 
 pub fn backup(_serial_port: &str) {

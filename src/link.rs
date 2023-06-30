@@ -42,6 +42,7 @@ const CRC_ALGO: Algorithm<u8> = Algorithm {
     residue: 0x00
 };
 
+#[derive(Debug)]
 pub enum Protocol {
     STDIO = 0x00,
     CAT = 0x01,
@@ -88,6 +89,7 @@ impl TryFrom<u8> for Protocol {
     }
 }
 
+#[derive(Debug)]
 pub struct Frame {
     pub proto: Protocol,
     pub data: Vec<u8>,
@@ -135,17 +137,25 @@ impl Link {
     /// This function listens on the serial line for a frame, unwraps it,
     /// checks the CRC and returns it to the caller for dispatching.
     pub fn receive(&mut self) -> Result<Frame, ErrorKind> {
-        let mut received: Vec<u8> = vec![0; 128];
-        let nread = self.port.read(&mut received);
-        match nread {
-            Ok(n) => received.resize(n, 0),
-            Err(e) => panic!("Error while receiving data response: {e:?}")
-        }
-        received.shrink_to_fit();
+        // Enqueue data until we get the first valid packet
+        let mut remainder: Vec<u8> = vec![];
+        let frames: Vec<Vec<u8>> = loop {
+            let mut received: Vec<u8> = vec![0; 128];
+            let nread = self.port.read(&mut received);
+            //println!("Rx: {:?}", received);
+            match nread {
+                Ok(n) => received.resize(n, 0),
+                Err(e) => panic!("Error while receiving data response: {e:?}")
+            };
+            remainder.extend(received);
+            remainder.shrink_to_fit();
 
-        // Validate and print response
-        // TODO: support decoding multiple and incomplete packets
-        let (frames, _remainder) = decode_packets(&received);
+            // Decode SLIP framing
+            let (frames, remainder) = decode_packets(&remainder);
+            if frames.len() > 0 {
+                break frames
+            }
+        };
 
         // Check CRC
         let crc = Crc::<u8>::new(&CRC_ALGO);
