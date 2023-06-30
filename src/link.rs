@@ -120,7 +120,9 @@ pub struct Link {
 impl Link {
     pub fn new(port: &str) -> Link {
         // This is the serial port used for the rtxlink connection
-        Link{port: serialport::new(port, 115200).timeout(Duration::from_millis(10)).open().expect("Failed to open port")}
+        Link{port: serialport::new(port, 115200).timeout(Duration::from_millis(10))
+                                                .open()
+                                                .expect("Failed to open port")}
     }
 
     /// This function sends out a frame over a serial line, wrapped in slip

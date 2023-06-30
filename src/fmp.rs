@@ -1,8 +1,11 @@
 //! This module handles the File Management Protocol portion of rtxlink
 
+use chrono;
+use std::ffi::CStr;
 use std::fmt;
 use std::fs::File;
 use std::fs::metadata;
+use std::fs::OpenOptions;
 use std::str;
 use std::thread;
 use std::time::Duration;
@@ -57,12 +60,14 @@ impl TryFrom<u8> for Opcode {
 }
 
 #[repr(C)]
+#[derive(Copy, Clone)]
 pub struct MemInfo {
     size: u32,      // Size of the memory in Bytes
     name: [u8; 24], // Name of the memory
     index: u32,     // Index for referencing this memory with FMP commands
 }
 
+// Useful for terminal printing
 impl fmt::Debug for MemInfo {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f,
@@ -70,6 +75,25 @@ impl fmt::Debug for MemInfo {
                self.index,
                str::from_utf8(&self.name).unwrap(),
                self.size)
+    }
+}
+
+// Used for deriving file names
+impl std::fmt::Display for MemInfo {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f,
+               "{}_{}_{}",
+               self.index,
+               unsafe{ CStr::from_ptr(self.name.as_ptr() as *const i8).to_str()
+                                                                      .unwrap()
+                                                                      .replace(" ", "") },
+               self.size)
+    }
+}
+
+impl From<&Vec<u8>> for MemInfo {
+    fn from(v: &Vec<u8>) -> MemInfo {
+        unsafe{ *std::mem::transmute::<*const u8, *const MemInfo>(v.as_ptr()) }
     }
 }
 
@@ -128,7 +152,7 @@ pub fn wait_reply(serial_port: &str, opcode: Opcode) -> Vec<Vec<u8>> {
     params
 }
 
-pub fn _xmodem_recv(_serial_port: &str, _output_file: &str) {
+pub fn xmodem_recv(serial_port: &str, output_file: &str) {
     // Create xmodem with 1K blocks
     let mut xmodem = xmodem::Xmodem::new();
     xmodem.block_length = xmodem::BlockLength::OneK;
@@ -136,20 +160,29 @@ pub fn _xmodem_recv(_serial_port: &str, _output_file: &str) {
     // Workaround for missing handle.is_running()
     // https://github.com/DenisKolodin/thread-control
     let (flag, control) = make_pair();
+    // Open serial port, open outfile
+    let mut port = serialport::new(serial_port, 115200).timeout(Duration::from_millis(10))
+                                                       .open()
+                                                       .expect("Failed to open port");
+    let mut file = OpenOptions::new()
+                .read(true)
+                .write(true)
+                .create(true)
+                .open(output_file)
+                .unwrap();
     let handle = thread::spawn(move || {
         if !flag.alive() { return; }
         println!("XMODEM transfer started");
-        // TODO: Open serial port, open outfile
-        //xmodem.recv(&mut serial_port, &mut output_file, xmodem::Checksum::CRC16)
-        //      .expect("Failed to receive xmodem transfer");
+        xmodem.recv(&mut port, &mut file, xmodem::Checksum::CRC16)
+              .expect("Failed to receive xmodem transfer");
         println!("XMODEM transfer finished");
     });
 
     // handle.is_running() is not available yet, use it when it is released
     // https://github.com/rust-lang/rust/issues/90470
     while !control.is_done() {
-        let output_size = metadata(OUTPUT_PATH).unwrap().len();
-        println!("{} size: {} Bytes", OUTPUT_PATH, output_size);
+        let output_size = metadata(output_file).unwrap().len();
+        println!("{} size: {} Bytes", output_file, output_size);
         thread::sleep(Duration::from_millis(1000));
     }
     // Wait for xmodem thread to finish
@@ -157,23 +190,36 @@ pub fn _xmodem_recv(_serial_port: &str, _output_file: &str) {
 }
 
 /// Print info about the memories available on the platform
-pub fn meminfo(serial_port: &str) -> String {
+pub fn meminfo(serial_port: &str) -> Vec<MemInfo> {
     send_cmd(serial_port, Opcode::MEMINFO, vec![]);
     // Receive MEMINFO response
     let available_mem = wait_reply(serial_port, Opcode::MEMINFO);
-    let mut memlist = String::from("\n");
-    for mem in available_mem {
-        let (_, m, _) = unsafe { mem.align_to::<MemInfo>() };
-        memlist.push_str(&format!("- {:?}\n", m));
-    }
     // Return MEMINFO response
-    memlist
+    let mem_list = available_mem.iter()
+                                .map(|m| MemInfo::from(m))
+                                .collect();
+    mem_list
 }
 
-pub fn backup(_serial_port: &str) {
-    // TODO: Enumerate all the memories, dump each in a file
-    // meminfo(..)
-    //xmodem_recv(..)
+pub fn dump(serial_port: &str, mem_id: u32, file_name: &str) {
+    // Request dump
+    let param: Vec<Vec<u8>> = vec![Vec::from(mem_id.to_ne_bytes())];
+    send_cmd(serial_port, Opcode::DUMP, param);
+    // Start xmodem receive
+    xmodem_recv(serial_port, file_name);
+}
+
+pub fn backup(serial_port: &str) {
+    // Enumerate all the memories, dump each in a separate file
+    let mem_list = meminfo(serial_port);
+    for mem in mem_list {
+        let mut file_name: String = String::from("");
+        file_name.push_str(&chrono::offset::Local::now().format("%d%m%Y_")
+                                                        .to_string());
+        file_name.push_str(&mem.to_string());
+        file_name.push_str(".bin");
+        dump(serial_port, mem.index, &file_name);
+    }
 }
 
 pub fn restore(serial_port: &str) {
