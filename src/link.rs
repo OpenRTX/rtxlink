@@ -23,24 +23,12 @@ The recognized protocol IDs are the following:
 ```
 */
 
-use crc::{Crc, Algorithm};
+use crc16::*;
 use serialport::SerialPort;
 use slip::{encode, decode_packets};
 use std::convert::TryFrom;
 use std::time::Duration;
 use std::io::ErrorKind;
-
-// rtxlink CRC8 polynomial
-const CRC_ALGO: Algorithm<u8> = Algorithm {
-    width: 8,
-    poly: 0xa6,
-    init: 0x00,
-    refin: false,
-    refout: false,
-    xorout: 0x00,
-    check: 0x62,
-    residue: 0x00
-};
 
 #[derive(Debug)]
 pub enum Protocol {
@@ -103,12 +91,10 @@ impl Frame {
         let mut bin_rep = Vec::from(self.data);
         // Prepend the Protocol IDentifier
         bin_rep.insert(0, self.proto as u8);
-        // Append the CRC8 using 0xA6 polynomial
-        let crc = Crc::<u8>::new(&CRC_ALGO);
-        let mut digest = crc.digest();
-        digest.update(bin_rep.as_slice());
-        let digest = digest.finalize();
-        bin_rep.push(digest);
+        // Append the CRC16 using CCITT polynomial
+        let digest = State::<AUG_CCITT>::calculate(bin_rep.as_slice());
+        bin_rep.push((digest & 0xff) as u8);
+        bin_rep.push((digest >> 8 & 0xff) as u8);
         bin_rep
     }
 }
@@ -153,23 +139,21 @@ impl Link {
             remainder.shrink_to_fit();
 
             // Decode SLIP framing
-            let (frames, remainder) = decode_packets(&remainder);
+            let (frames, _remainder) = decode_packets(&remainder);
             if frames.len() > 0 {
                 break frames
             }
         };
 
-        // Check CRC
-        let crc = Crc::<u8>::new(&CRC_ALGO);
-        let mut digest = crc.digest();
-        digest.update(frames[0].as_slice());
-        if digest.finalize() != 0x00 {
+        // Check CRC16 using CCITT polynomial
+        let digest = State::<AUG_CCITT>::calculate(&frames[0]);
+        if digest != 0x0000 {
             return Err(ErrorKind::InvalidData);
         }
         // Assign correct protocol
         let proto = Protocol::try_from(frames[0][0]).expect("Protocol not implemented!");
         // Trim proto (1 byte at beginning) and CRC (1 byte at end)
-        let data = &frames[0][1..frames[0].len() - 1];
+        let data = &frames[0][1..frames[0].len() - 2];
         let frame = Frame {proto: proto, data: Vec::from(data)};
         Ok(frame)
     }

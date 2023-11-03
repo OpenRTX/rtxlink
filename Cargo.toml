@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 byteorder = "1"
 chrono = "0"
-crc = "3"
+crc16 = "*"
 serialport = "4"
 slip = { version = "0", package = "simple_slip" }
 text-colorizer = "1"
