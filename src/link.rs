@@ -19,7 +19,7 @@ The recognized protocol IDs are the following:
 | 0x00 | stdio redirection    |
 | 0x01 | CAT command/response |
 | 0x02 | FMP command/response |
-| 0x03 | XMODEM command/frame |
+| 0x03 | DAT frame/ack        |
 ```
 */
 
@@ -35,7 +35,7 @@ pub enum Protocol {
     STDIO = 0x00,
     CAT = 0x01,
     FMP = 0x02,
-    XMODEM = 0x03
+    DAT = 0x03
 }
 
 /// POSIX Errors
@@ -71,7 +71,7 @@ impl TryFrom<u8> for Protocol {
             x if x == Protocol::STDIO as u8 => Ok(Protocol::STDIO),
             x if x == Protocol::CAT as u8 => Ok(Protocol::CAT),
             x if x == Protocol::FMP as u8 => Ok(Protocol::FMP),
-            x if x == Protocol::XMODEM as u8 => Ok(Protocol::XMODEM),
+            x if x == Protocol::DAT as u8 => Ok(Protocol::DAT),
             _ => Err(()),
         }
     }
