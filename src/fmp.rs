@@ -16,8 +16,7 @@ use crate::link::Errno;
 use crate::link::Frame;
 use crate::link::Link;
 use crate::link::Protocol;
-
-const OUTPUT_PATH: &str = "./flash_dump.bin";
+use crate::dat;
 
 /// FMP Protocol Opcodes
 #[derive(PartialEq, Eq, Debug)]
@@ -62,16 +61,14 @@ impl TryFrom<u8> for Opcode {
 #[derive(Copy, Clone)]
 pub struct MemInfo {
     size: u32,      // Size of the memory in Bytes
-    name: [u8; 24], // Name of the memory
-    index: u32,     // Index for referencing this memory with FMP commands
+    name: [u8; 20], // Name of the memory
 }
 
 // Useful for terminal printing
 impl fmt::Debug for MemInfo {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f,
-               "Index: {}, Name: {}, Size: {}",
-               self.index,
+               "{} ({}B)",
                str::from_utf8(&self.name).unwrap(),
                self.size)
     }
@@ -81,8 +78,7 @@ impl fmt::Debug for MemInfo {
 impl std::fmt::Display for MemInfo {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f,
-               "{}_{}_{}",
-               self.index,
+               "{}_{}",
                unsafe{ CStr::from_ptr(self.name.as_ptr() as *const i8).to_str()
                                                                       .unwrap()
                                                                       .replace(" ", "") },
@@ -163,21 +159,18 @@ pub fn meminfo(serial_port: &str) -> Vec<MemInfo> {
     mem_list
 }
 
-pub fn backup(serial_port: &str) {
-    // Enumerate all the memories, dump each in a separate file
-    let mem_list = meminfo(serial_port);
-    for mem in mem_list {
-        let mut file_name: String = String::from("");
-        file_name.push_str(&chrono::offset::Local::now().format("%d%m%Y_")
-                                                        .to_string());
-        file_name.push_str(&mem.to_string());
-        file_name.push_str(".bin");
-        dump(serial_port, mem.index, &file_name);
-    }
+/// Dump memory device into a file
+pub fn dump(serial_port: &str, mem_id: usize, mem: &MemInfo, file_name: &str) -> std::io::Result<()> {
+    // Send Dump FMP command then listen for incoming DAT transfer
+    send_cmd(serial_port, Opcode::DUMP, [[mem_id as u8].to_vec()].to_vec());
+    wait_reply(serial_port, Opcode::DUMP);
+    dat::receive(serial_port, file_name, mem.size as usize)
 }
 
-// TODO:
-pub fn dump(serial_port: &str, mem_id: u32, file_name: &str);
-
-// TODO:
-pub fn restore(serial_port: &str);
+/// Flash a given file into a particular memory device of a radio
+pub fn flash(serial_port: &str, mem_id: usize, mem: &MemInfo, file_name: &str) {
+    // Send Fump FMP command then send content over DAT
+    send_cmd(serial_port, Opcode::FLASH, [[mem_id as u8].to_vec()].to_vec());
+    wait_reply(serial_port, Opcode::FLASH);
+    dat::send(serial_port, file_name, mem.size as usize);
+}

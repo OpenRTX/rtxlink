@@ -24,7 +24,7 @@ The recognized protocol IDs are the following:
 */
 
 use crc16::*;
-use serialport::SerialPort;
+use serial2::SerialPort;
 use slip::{encode, decode_packets};
 use std::convert::TryFrom;
 use std::time::Duration;
@@ -100,15 +100,16 @@ impl Frame {
 }
 
 pub struct Link {
-    port: Box<dyn SerialPort>,
+    port: SerialPort,
 }
 
 impl Link {
     pub fn new(port: &str) -> Link {
         // This is the serial port used for the rtxlink connection
-        Link{port: serialport::new(port, 115200).timeout(Duration::from_millis(10))
-                                                .open()
-                                                .expect("Failed to open port")}
+        let mut port = SerialPort::open(port, 115200).expect("Failed to open port");
+        port.set_read_timeout(Duration::new(5, 0))
+            .expect("Error in setting timeout!");
+        Link{port}
     }
 
     /// This function sends out a frame over a serial line, wrapped in slip
@@ -119,6 +120,7 @@ impl Link {
         let bin_frame = frame.bin();
         let encoded: Vec<u8> = encode(&bin_frame).unwrap();
         // Send frame down the serial port
+        // println!("Tx: {:?}", encoded);
         self.port.write(encoded.as_slice()).expect("Error in sending frame");
     }
 
@@ -130,7 +132,7 @@ impl Link {
         let frames: Vec<Vec<u8>> = loop {
             let mut received: Vec<u8> = vec![0; 128];
             let nread = self.port.read(&mut received);
-            //println!("Rx: {:?}", received);
+            // println!("Rx: {:?} N={:?}", received, nread);
             match nread {
                 Ok(n) => received.resize(n, 0),
                 Err(e) => panic!("Error while receiving data response: {e:?}")

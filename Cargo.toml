@@ -9,7 +9,7 @@ edition = "2021"
 byteorder = "1"
 chrono = "0"
 crc16 = "*"
-serialport = "4"
+serial2 = "0"
 slip = { version = "0", package = "simple_slip" }
 text-colorizer = "1"
 thread-control = "0"
