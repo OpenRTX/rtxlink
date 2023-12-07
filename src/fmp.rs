@@ -60,8 +60,9 @@ impl TryFrom<u8> for Opcode {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct MemInfo {
-    size: u32,      // Size of the memory in Bytes
-    name: [u8; 20], // Name of the memory
+    size:  u32,     // Size of the memory in Bytes
+    flags: u8,      // Flags
+    name: [u8; 27], // Name of the memory
 }
 
 // Useful for terminal printing
