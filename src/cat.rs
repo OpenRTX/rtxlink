@@ -33,10 +33,10 @@ impl TryFrom<u8> for Opcode {
 /// CAT Protocol IDs
 #[derive(Copy, Clone)]
 enum ID {
-    INFO   = 0x494E, // IN
-    FREQRX = 0x5246, // FR
-    FREQTX = 0x5446, // FT
-
+    INFO         = 0x494E, // IN
+    FREQRX       = 0x5246, // RF
+    FREQTX       = 0x5446, // TF
+    FILETRANSFER = 0x4654, // FT
 }
 
 /// Convert Hertz in MegaHertz
@@ -138,4 +138,10 @@ pub fn freq(serial_port: &str, data: Option<String>, is_tx: bool) {
             set(serial_port, id, &data);
         },
     };
+}
+
+/// CAT SET file transfer mode
+pub fn ftm(serial_port: &str) {
+    let mut data: [u8; 0] = [];
+    set(serial_port, ID::FILETRANSFER, &data);
 }

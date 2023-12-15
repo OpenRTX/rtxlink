@@ -39,6 +39,8 @@ pub fn backup(serial_port: &str) {
     let radio_name = cat::info(serial_port);
     // Enumerate all the memories, dump each in a separate file
     let mem_list = fmp::meminfo(serial_port);
+    // Put the radio in file transfer mode and dump all the memories
+    cat::ftm(serial_port);
     for (i, mem) in mem_list.iter().enumerate() {
         let mut file_name: String = String::from("");
         file_name.push_str(&radio_name);
