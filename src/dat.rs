@@ -13,13 +13,6 @@ use crate::link::Protocol;
 const DAT_FRAME_SIZE: usize = 1024;
 const DAT_PAYLOAD_SIZE: usize = DAT_FRAME_SIZE - 2;
 
-/// This function sends an empty package to request data from the device
-pub fn request_data(serial_port: &str) {
-    let mut link = Link::new(serial_port);
-    let frame = Frame{proto: Protocol::DAT, data: vec![]};
-    link.send(frame);
-}
-
 /// This function sends an ACK to signal the correct reception of a DAT frame
 pub fn send_ack(serial_port: &str) {
     let mut link = Link::new(serial_port);
@@ -50,12 +43,12 @@ pub fn wait_ack(serial_port: &str) {
 /// This function receives data using the DAT protocol
 pub fn receive(serial_port: &str, file_name: &str, size: usize) -> std::io::Result<()> {
     let mut receive_size: usize = 0;
-    let mut prev_block: u8 = 0;
+    let mut prev_block: i16 = -1;
     let mut file = File::create(&file_name)?;
     let mut link = Link::new(serial_port);
     // Loop until we get a message of the right protocol
     let mut frame: Frame;
-    request_data(serial_port);
+    send_ack(serial_port);
     while receive_size != size {
         loop {
             frame = link.receive().expect("Error while reading frame");
@@ -68,10 +61,10 @@ pub fn receive(serial_port: &str, file_name: &str, size: usize) -> std::io::Resu
         let block_number = frame.data[0];
         let inv_block_number = frame.data[1];
         if (block_number + inv_block_number != 255) ||
-           (block_number != prev_block + 1) {
+           (block_number != (prev_block + 1) as u8) {
             return Err(Error::new(ErrorKind::Other, "Error in DAT protocol receive: bad block indexing!"));
         }
-        prev_block = block_number;
+        prev_block = block_number as i16;
         receive_size += frame.data.len() - 2;
         file.write_all(&frame.data[2..])?;
         send_ack(serial_port);
