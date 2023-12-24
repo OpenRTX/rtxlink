@@ -24,11 +24,12 @@ The recognized protocol IDs are the following:
 */
 
 use crc16::*;
-use serial2::SerialPort;
-use slip::{encode, decode_packets};
+use serialport::SerialPort;
 use std::convert::TryFrom;
 use std::time::Duration;
-use std::io::ErrorKind;
+use std::io::{BufRead, BufReader, ErrorKind};
+
+use crate::slip;
 
 #[derive(Debug)]
 pub enum Protocol {
@@ -100,16 +101,15 @@ impl Frame {
 }
 
 pub struct Link {
-    port: SerialPort,
+    port: BufReader<Box <dyn SerialPort>>,
 }
 
 impl Link {
     pub fn new(port: &str) -> Link {
         // This is the serial port used for the rtxlink connection
-        let mut port = SerialPort::open(port, 115200).expect("Failed to open port");
-        port.set_read_timeout(Duration::new(5, 0))
-            .expect("Error in setting timeout!");
-        Link{port}
+        Link{port: BufReader::new(serialport::new(port, 115_200).timeout(Duration::from_millis(10000))
+                                        .open()
+                                        .expect("Failed to open port"))}
     }
 
     /// This function sends out a frame over a serial line, wrapped in slip
@@ -118,30 +118,28 @@ impl Link {
     pub fn send(&mut self, frame: Frame) {
         // Generate binary representation of frame
         let bin_frame = frame.bin();
-        let encoded: Vec<u8> = encode(&bin_frame).unwrap();
+        let encoded: Vec<u8> = slip::encode(&bin_frame);
         // Send frame down the serial port
         // println!("Tx: {:?}", encoded);
-        self.port.write(encoded.as_slice()).expect("Error in sending frame");
+        self.port.get_mut().write_all(encoded.as_slice()).expect("Error in sending frame");
     }
 
     /// This function listens on the serial line for a frame, unwraps it,
     /// checks the CRC and returns it to the caller for dispatching.
     pub fn receive(&mut self) -> Result<Frame, ErrorKind> {
         // Enqueue data until we get the first valid packet
-        let mut remainder: Vec<u8> = vec![];
+        let mut remainder: Vec<u8> = vec![0; 1026];
         let frames: Vec<Vec<u8>> = loop {
-            let mut received: Vec<u8> = vec![0; 128];
-            let nread = self.port.read(&mut received);
-            // println!("Rx: {:?} N={:?}", received, nread);
-            match nread {
-                Ok(n) => received.resize(n, 0),
-                Err(e) => panic!("Error while receiving data response: {e:?}")
-            };
-            remainder.extend(received);
+            let mut buffer: Vec<u8> = vec![0; 128];
+            let nread = self.port.read_until(slip::END, &mut buffer).expect("Error during serial rx");
+            let (_, received) = &buffer.split_at(buffer.len() - nread);
+            println!("Rx: {:?} N={:?}", received, nread);
+            remainder.extend(*received);
             remainder.shrink_to_fit();
 
             // Decode SLIP framing
-            let (frames, _remainder) = decode_packets(&remainder);
+            let (frames, remainder) = slip::decode_frames(&remainder).expect("Error in SLIP decode");
+            println!("Frames: {:?}", frames);
             if frames.len() > 0 {
                 break frames
             }

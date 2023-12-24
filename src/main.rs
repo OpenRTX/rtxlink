@@ -2,6 +2,7 @@ use std::env;
 use std::process;
 use text_colorizer::*;
 
+mod slip;
 mod link;
 mod cat;
 mod fmp;
