@@ -133,13 +133,13 @@ impl Link {
             let mut buffer: Vec<u8> = vec![0; 128];
             let nread = self.port.read_until(slip::END, &mut buffer).expect("Error during serial rx");
             let (_, received) = &buffer.split_at(buffer.len() - nread);
-            println!("Rx: {:?} N={:?}", received, nread);
+            // println!("Rx: {:?} N={:?}", received, nread);
             remainder.extend(*received);
             remainder.shrink_to_fit();
 
             // Decode SLIP framing
             let (frames, remainder) = slip::decode_frames(&remainder).expect("Error in SLIP decode");
-            println!("Frames: {:?}", frames);
+            // println!("Frames: {:?}", frames);
             if frames.len() > 0 {
                 break frames
             }

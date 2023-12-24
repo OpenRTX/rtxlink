@@ -14,8 +14,7 @@ const DAT_FRAME_SIZE: usize = 1024;
 const DAT_PAYLOAD_SIZE: usize = DAT_FRAME_SIZE - 2;
 
 /// This function sends an ACK to signal the correct reception of a DAT frame
-pub fn send_ack(serial_port: &str) {
-    let mut link = Link::new(serial_port);
+pub fn send_ack(link: &mut Link) {
     let frame = Frame{proto: Protocol::DAT, data: vec![0x06]};
     link.send(frame);
 }
@@ -48,7 +47,7 @@ pub fn receive(serial_port: &str, file_name: &str, size: usize) -> std::io::Resu
     let mut link = Link::new(serial_port);
     // Loop until we get a message of the right protocol
     let mut frame: Frame;
-    send_ack(serial_port);
+    send_ack(&mut link);
     while receive_size != size {
         loop {
             frame = link.receive().expect("Error while reading frame");
@@ -67,7 +66,7 @@ pub fn receive(serial_port: &str, file_name: &str, size: usize) -> std::io::Resu
         prev_block = block_number as i16;
         receive_size += frame.data.len() - 2;
         file.write_all(&frame.data[2..])?;
-        send_ack(serial_port);
+        send_ack(&mut link);
     }
     Ok(())
 }
