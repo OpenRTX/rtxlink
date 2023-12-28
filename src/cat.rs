@@ -142,6 +142,6 @@ pub fn freq(serial_port: &str, data: Option<String>, is_tx: bool) {
 
 /// CAT SET file transfer mode
 pub fn ftm(serial_port: &str) {
-    let mut data: [u8; 0] = [];
+    let data: [u8; 0] = [];
     set(serial_port, ID::FILETRANSFER, &data);
 }

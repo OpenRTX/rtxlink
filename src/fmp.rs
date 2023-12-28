@@ -1,16 +1,9 @@
 //! This module handles the File Management Protocol portion of rtxlink
 
-use chrono;
 use std::ffi::CStr;
 use std::fmt;
-use std::fs::File;
-use std::fs::metadata;
-use std::fs::OpenOptions;
 use std::str;
-use std::thread;
-use std::time::Duration;
 use text_colorizer::*;
-use thread_control::make_pair;
 
 use crate::link::Errno;
 use crate::link::Frame;

@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use std::io::{Error, ErrorKind, Result};
 
 pub const END: u8 = 0xC0;
@@ -28,39 +29,7 @@ pub fn encode(data: &[u8]) -> Vec<u8> {
     encoded_data
 }
 
-pub fn decode(data: &[u8]) -> Result<Vec<u8>> {
-    let mut decoded_data = Vec::new();
-    let mut escaped = false;
-
-    for byte in data {
-        match byte {
-            &END => break,
-            &ESC => {
-                escaped = true;
-            }
-            &ESC_END if escaped => {
-                decoded_data.push(END);
-                escaped = false;
-            }
-            &ESC_ESC if escaped => {
-                decoded_data.push(ESC);
-                escaped = false;
-                ()
-            }
-            _ => {
-                if escaped {
-                    return Err(Error::new(ErrorKind::InvalidData, "Invalid SLIP escape sequence"));
-                }
-                decoded_data.push(*byte);
-                ()
-            }
-        }
-    }
-    
-    Ok(decoded_data)
-}
-
-pub fn decode_frames(data: &[u8]) -> Result<(Vec<Vec<u8>>, &[u8])> {
+pub fn decode_frames(data: &mut VecDeque<u8>) -> Result<Vec<Vec<u8>>> {
     let mut frames = Vec::new();
     let mut packet = Vec::new();
     let mut escaped = false;
@@ -95,17 +64,20 @@ pub fn decode_frames(data: &[u8]) -> Result<(Vec<Vec<u8>>, &[u8])> {
                 packet.push(ESC);
                 escaped = false;
             }
-            _ => {
+            x => {
                 if escaped {
                     return Err(Error::new(ErrorKind::InvalidData, "Invalid SLIP escape sequence"));
                 }
                 if in_packet {
-                    packet.push(data[i]);
+                    packet.push(x);
                 } 
             }
         }
     }
-    
+    for _ in 0..remainder_index {
+        data.pop_front();
+    }
+
     // Return unused bytes
-    Ok((frames, &data[remainder_index..]))
+    Ok(frames)
 }

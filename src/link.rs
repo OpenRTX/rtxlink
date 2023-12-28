@@ -26,6 +26,7 @@ The recognized protocol IDs are the following:
 use crc16::*;
 use serialport::SerialPort;
 use std::convert::TryFrom;
+use std::collections::VecDeque;
 use std::time::Duration;
 use std::io::{BufRead, BufReader, ErrorKind};
 
@@ -128,17 +129,17 @@ impl Link {
     /// checks the CRC and returns it to the caller for dispatching.
     pub fn receive(&mut self) -> Result<Frame, ErrorKind> {
         // Enqueue data until we get the first valid packet
-        let mut remainder: Vec<u8> = vec![0; 1026];
+        let mut decode_buffer = VecDeque::<u8>::new();
         let frames: Vec<Vec<u8>> = loop {
-            let mut buffer: Vec<u8> = vec![0; 128];
-            let nread = self.port.read_until(slip::END, &mut buffer).expect("Error during serial rx");
-            let (_, received) = &buffer.split_at(buffer.len() - nread);
-            // println!("Rx: {:?} N={:?}", received, nread);
-            remainder.extend(*received);
-            remainder.shrink_to_fit();
+            let mut receive_buffer: Vec<u8> = vec![0; 128];
+            let nread = self.port.read_until(slip::END, &mut receive_buffer).expect("Error during serial rx");
+            for i in receive_buffer.len()-nread..receive_buffer.len() {
+                decode_buffer.push_back(receive_buffer[i]);
+            }
+            // println!("Rx: {:?} N={:?}", decode_buffer, nread);
 
             // Decode SLIP framing
-            let (frames, remainder) = slip::decode_frames(&remainder).expect("Error in SLIP decode");
+            let frames = slip::decode_frames(&mut decode_buffer).expect("Error in SLIP decode");
             // println!("Frames: {:?}", frames);
             if frames.len() > 0 {
                 break frames
