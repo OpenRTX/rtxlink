@@ -28,7 +28,8 @@ use serialport::SerialPort;
 use std::convert::TryFrom;
 use std::collections::VecDeque;
 use std::time::Duration;
-use std::io::{BufRead, BufReader, ErrorKind};
+use std::io::ErrorKind;
+use std::mem::replace;
 
 use crate::slip;
 
@@ -102,15 +103,31 @@ impl Frame {
 }
 
 pub struct Link {
-    port: BufReader<Box <dyn SerialPort>>,
+    port: Option<Box <dyn SerialPort>>,
 }
 
 impl Link {
-    pub fn new(port: &str) -> Link {
+    // This operation has to be performed only once, subsequent calls need to be get
+    pub fn new(port: &str) {
         // This is the serial port used for the rtxlink connection
-        Link{port: BufReader::new(serialport::new(port, 115_200).timeout(Duration::from_millis(10000))
-                                        .open()
-                                        .expect("Failed to open port"))}
+        unsafe {
+            assert!(!LINK.port.is_some(), "Serial port created more than once!");
+            LINK = Link{port: Some(serialport::new(port, 115_200).timeout(Duration::from_millis(2000))
+                                            .open()
+                                            .expect("Failed to open port"))};
+        }
+    }
+
+    pub fn acquire() -> Link {
+        unsafe {
+            replace(&mut LINK, Link { port: None })
+        }
+    }
+
+    pub fn release(self) {
+        unsafe {
+            let _ = replace(&mut LINK, self);
+        }
     }
 
     /// This function sends out a frame over a serial line, wrapped in slip
@@ -121,8 +138,8 @@ impl Link {
         let bin_frame = frame.bin();
         let encoded: Vec<u8> = slip::encode(&bin_frame);
         // Send frame down the serial port
-        // println!("Tx: {:?}", encoded);
-        self.port.get_mut().write_all(encoded.as_slice()).expect("Error in sending frame");
+        // println!("Tx: {:x?}", encoded);
+        self.port.as_mut().unwrap().write_all(encoded.as_slice()).expect("Error in sending frame");
     }
 
     /// This function listens on the serial line for a frame, unwraps it,
@@ -131,12 +148,12 @@ impl Link {
         // Enqueue data until we get the first valid packet
         let mut decode_buffer = VecDeque::<u8>::new();
         let frames: Vec<Vec<u8>> = loop {
-            let mut receive_buffer: Vec<u8> = vec![0; 128];
-            let nread = self.port.read_until(slip::END, &mut receive_buffer).expect("Error during serial rx");
-            for i in receive_buffer.len()-nread..receive_buffer.len() {
+            let mut receive_buffer: Vec<u8> = vec![0; 1024];
+            let nread = self.port.as_mut().unwrap().read(&mut receive_buffer).expect("Error during serial rx");
+            for i in 0..nread {
                 decode_buffer.push_back(receive_buffer[i]);
             }
-            // println!("Rx: {:?} N={:?}", decode_buffer, nread);
+            // println!("Rx: {:x?} N={:?}", decode_buffer, nread);
 
             // Decode SLIP framing
             let frames = slip::decode_frames(&mut decode_buffer).expect("Error in SLIP decode");
@@ -159,3 +176,5 @@ impl Link {
         Ok(frame)
     }
 }
+
+static mut LINK: Link = Link { port: None };

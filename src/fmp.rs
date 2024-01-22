@@ -87,8 +87,8 @@ impl From<&Vec<u8>> for MemInfo {
 }
 
 /// This function sends an FMP command
-pub fn send_cmd(serial_port: &str, opcode: Opcode, params: Vec<Vec<u8>>) {
-    let mut link = Link::new(serial_port);
+pub fn send_cmd(opcode: Opcode, params: Vec<Vec<u8>>) {
+    let mut link = Link::acquire();
     let mut cmd: Vec<u8> = vec![opcode as u8,
                                 params.len() as u8];
     for p in params {
@@ -97,12 +97,13 @@ pub fn send_cmd(serial_port: &str, opcode: Opcode, params: Vec<Vec<u8>>) {
     };
     let frame = Frame{proto: Protocol::FMP, data: cmd};
     link.send(frame);
+    link.release();
 }
 
 /// This function reads the response of an FMP command, checking the error code
 /// and returning the arguments of the response, possibly none
-pub fn wait_reply(serial_port: &str, opcode: Opcode) -> Vec<Vec<u8>> {
-    let mut link = Link::new(serial_port);
+pub fn wait_reply(opcode: Opcode) -> Vec<Vec<u8>> {
+    let mut link = Link::acquire();
     // Loop until we get a message of the right protocol
     let mut frame: Frame;
     loop {
@@ -138,14 +139,15 @@ pub fn wait_reply(serial_port: &str, opcode: Opcode) -> Vec<Vec<u8>> {
         params.push(param);
         prev_params += param_size;
     }
+    link.release();
     params
 }
 
 /// Print info about the memories available on the platform
-pub fn meminfo(serial_port: &str) -> Vec<MemInfo> {
-    send_cmd(serial_port, Opcode::MEMINFO, vec![]);
+pub fn meminfo() -> Vec<MemInfo> {
+    send_cmd(Opcode::MEMINFO, vec![]);
     // Receive MEMINFO response
-    let available_mem = wait_reply(serial_port, Opcode::MEMINFO);
+    let available_mem = wait_reply(Opcode::MEMINFO);
     // Return MEMINFO response
     let mem_list = available_mem.iter()
                                 .map(|m| MemInfo::from(m))
@@ -154,17 +156,17 @@ pub fn meminfo(serial_port: &str) -> Vec<MemInfo> {
 }
 
 /// Dump memory device into a file
-pub fn dump(serial_port: &str, mem_id: usize, mem: &MemInfo, file_name: &str) -> std::io::Result<()> {
+pub fn dump(mem_id: usize, mem: &MemInfo, file_name: &str) -> std::io::Result<()> {
     // Send Dump FMP command then listen for incoming DAT transfer
-    send_cmd(serial_port, Opcode::DUMP, [[mem_id as u8].to_vec()].to_vec());
-    wait_reply(serial_port, Opcode::DUMP);
-    dat::receive(serial_port, file_name, mem.size as usize)
+    send_cmd(Opcode::DUMP, [[mem_id as u8].to_vec()].to_vec());
+    wait_reply(Opcode::DUMP);
+    dat::receive(file_name, mem.size as usize)
 }
 
 /// Flash a given file into a particular memory device of a radio
-pub fn flash(serial_port: &str, mem_id: usize, mem: &MemInfo, file_name: &str) {
+pub fn flash(mem_id: usize, mem: &MemInfo, file_name: &str) {
     // Send Fump FMP command then send content over DAT
-    send_cmd(serial_port, Opcode::FLASH, [[mem_id as u8].to_vec()].to_vec());
-    wait_reply(serial_port, Opcode::FLASH);
-    dat::send(serial_port, file_name, mem.size as usize);
+    send_cmd(Opcode::FLASH, [[mem_id as u8].to_vec()].to_vec());
+    wait_reply(Opcode::FLASH);
+    dat::send(file_name, mem.size as usize);
 }

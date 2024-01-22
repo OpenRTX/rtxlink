@@ -43,8 +43,8 @@ enum ID {
 const HZ_IN_MHZ: f64 = 1000000.0;
 
 /// CAT GET request
-fn get(serial_port: &str, id: ID) -> Vec<u8> {
-    let mut link = Link::new(serial_port);
+fn get(id: ID) -> Vec<u8> {
+    let mut link = Link::acquire();
 
     let cmd: Vec<u8> = vec![Opcode::GET as u8,
                             ((id as u16 >> 8) & 0xff) as u8,
@@ -71,12 +71,13 @@ fn get(serial_port: &str, id: ID) -> Vec<u8> {
         Opcode::DATA => { data.remove(0); () }, // Correct response!
         _ => panic!("Error while parsing GET response"),
     };
+    link.release();
     data
 }
 
 /// CAT SET request
-fn set(serial_port: &str, id: ID, data: &[u8]) {
-    let mut link = Link::new(serial_port);
+fn set(id: ID, data: &[u8]) {
+    let mut link = Link::acquire();
 
     let mut cmd: Vec<u8> = vec![Opcode::SET as u8,
                                 ((id as u16 >> 8) & 0xff) as u8,
@@ -103,11 +104,12 @@ fn set(serial_port: &str, id: ID, data: &[u8]) {
         }, // Error?
         _ => panic!("Error while parsing SET response"),
     };
+    link.release();
 }
 
 /// CAT GET radio info
-pub fn info(serial_port: &str) -> String {
-    let data: Vec<u8> = get(serial_port, ID::INFO);
+pub fn info() -> String {
+    let data: Vec<u8> = get(ID::INFO);
     match str::from_utf8(&data) {
         Ok(name) => String::from(name),
         Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
@@ -115,13 +117,13 @@ pub fn info(serial_port: &str) -> String {
 }
 
 /// CAT GET or SET radio frequency
-pub fn freq(serial_port: &str, data: Option<String>, is_tx: bool) {
+pub fn freq(data: Option<String>, is_tx: bool) {
     let id = if is_tx { ID::FREQTX } else { ID::FREQRX };
     // If user supplied no data print frequency, otherwise set
     match data {
         // GET
         None => {
-            let data: Vec<u8> = get(serial_port, id);
+            let data: Vec<u8> = get(id);
             let freq: u32 = LittleEndian::read_u32(&data);
             let freq: f64 = freq as f64 / HZ_IN_MHZ;
             match is_tx {
@@ -135,13 +137,13 @@ pub fn freq(serial_port: &str, data: Option<String>, is_tx: bool) {
             let freq: u32 = (freq * HZ_IN_MHZ) as u32;
             let mut data: [u8; 4] = [0, 0, 0, 0];
             LittleEndian::write_u32(&mut data, freq);
-            set(serial_port, id, &data);
+            set(id, &data);
         },
     };
 }
 
 /// CAT SET file transfer mode
-pub fn ftm(serial_port: &str) {
+pub fn ftm() {
     let data: [u8; 0] = [];
-    set(serial_port, ID::FILETRANSFER, &data);
+    set(ID::FILETRANSFER, &data);
 }

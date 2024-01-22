@@ -20,8 +20,8 @@ pub fn send_ack(link: &mut Link) {
 }
 
 /// This function sends an ACK to signal the correct reception of a DAT frame
-pub fn wait_ack(serial_port: &str) {
-    let mut link = Link::new(serial_port);
+pub fn wait_ack() {
+    let mut link = Link::acquire();
     // Loop until we get a message of the right protocol
     let mut frame: Frame;
     loop {
@@ -37,14 +37,15 @@ pub fn wait_ack(serial_port: &str) {
         0x06 => (),
         status => println!("{}: {:?}", "Error".bold().red(), Errno::try_from(status).unwrap()),
     }
+    link.release();
 }
 
 /// This function receives data using the DAT protocol
-pub fn receive(serial_port: &str, file_name: &str, size: usize) -> std::io::Result<()> {
+pub fn receive(file_name: &str, size: usize) -> std::io::Result<()> {
     let mut receive_size: usize = 0;
     let mut prev_block: i16 = -1;
     let mut file = File::create(&file_name)?;
-    let mut link = Link::new(serial_port);
+    let mut link = Link::acquire();
     // Loop until we get a message of the right protocol
     let mut frame: Frame;
     send_ack(&mut link);
@@ -68,11 +69,12 @@ pub fn receive(serial_port: &str, file_name: &str, size: usize) -> std::io::Resu
         file.write_all(&frame.data[2..])?;
         send_ack(&mut link);
     }
+    link.release();
     Ok(())
 }
 
 /// This function sends data using the DAT protocol
-pub fn send(serial_port: &str, file_name: &str, size: usize) {
+pub fn send(file_name: &str, size: usize) {
     let file_content = read(&file_name).expect("Error in reading backup file!");
     if size != file_content.len() {
         panic!("Backup file does not match with memory size!");
@@ -89,9 +91,10 @@ pub fn send(serial_port: &str, file_name: &str, size: usize) {
         let end_offset = start_offset + chunk_size;
         chunk[2..chunk_size + 2].copy_from_slice(&file_content[start_offset..end_offset]);
         chunk.resize(chunk_size, 0);
-        let mut link = Link::new(serial_port);
+        let mut link = Link::acquire();
         let frame = Frame{proto: Protocol::DAT, data: chunk};
         link.send(frame);
-        wait_ack(serial_port);
+        link.release();
+        wait_ack();
     }
 }
