@@ -27,10 +27,10 @@ fn print_usage(cmd: &String) {
 /// Print info about the target OpenRTX platform
 fn print_info() {
     println!("Radio identifier: {}", cat::info());
-    let memlist = fmp::meminfo();
+    let mem_list = fmp::meminfo();
     println!("Available memories:");
     let mut i: usize = 0;
-    for mem in memlist {
+    for mem in mem_list {
         println!("[{}]: {:?}", i, mem);
         i += 1;
     };

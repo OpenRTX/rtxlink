@@ -157,7 +157,7 @@ impl Link {
 
             // Decode SLIP framing
             let frames = slip::decode_frames(&mut decode_buffer).expect("Error in SLIP decode");
-            // println!("Frames: {:?}", frames);
+            // println!("Rx Frames: {:x?}", frames);
             if frames.len() > 0 {
                 break frames
             }

@@ -49,7 +49,7 @@ pub fn receive(file_name: &str, size: usize) -> std::io::Result<()> {
     // Loop until we get a message of the right protocol
     let mut frame: Frame;
     send_ack(&mut link);
-    while receive_size != size {
+    while receive_size < size {
         loop {
             frame = link.receive().expect("Error while reading frame");
             match frame.proto {
