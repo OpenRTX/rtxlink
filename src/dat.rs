@@ -68,6 +68,7 @@ pub fn receive(file_name: &str, size: usize) -> std::io::Result<()> {
         receive_size += frame.data.len() - 2;
         file.write_all(&frame.data[2..])?;
         send_ack(&mut link);
+        println!("Received: {receive_size:?}/{size:?}");
     }
     link.release();
     Ok(())

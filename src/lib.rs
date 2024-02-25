@@ -1,6 +1,7 @@
-pub mod slip;
-pub mod link;
 pub mod cat;
-pub mod fmp;
 pub mod dat;
+pub mod flow;
+pub mod fmp;
+pub mod link;
+pub mod slip;
 mod tests;
