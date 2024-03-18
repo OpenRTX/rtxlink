@@ -55,8 +55,8 @@ fn main() {
         "info" => print_info(),
         "freqrx" => cat::freq(data_0, false),
         "freqtx" => cat::freq(data_0, true),
-        "backup" => flow::backup(None),
-        "restore" => flow::restore(data_0, data_1),
+        "backup" => flow::backup(None, None),
+        "restore" => flow::restore(data_0, data_1, None),
         _ => print_usage(&args[0]),
     };
 }

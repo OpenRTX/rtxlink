@@ -4,6 +4,7 @@ use text_colorizer::*;
 use std::fs::{File, read};
 use std::io::Write;
 use std::io::{Error, ErrorKind};
+use std::sync::mpsc::Sender;
 
 use crate::link::Errno;
 use crate::link::Frame;
@@ -41,7 +42,7 @@ pub fn wait_ack() {
 }
 
 /// This function receives data using the DAT protocol
-pub fn receive(file_name: &str, size: usize) -> std::io::Result<()> {
+pub fn receive(file_name: &str, size: usize, progress: Option<&Sender<(usize, usize)>>) -> std::io::Result<()> {
     let mut receive_size: usize = 0;
     let mut prev_block: i16 = -1;
     let mut file = File::create(&file_name)?;
@@ -69,14 +70,21 @@ pub fn receive(file_name: &str, size: usize) -> std::io::Result<()> {
         file.write_all(&frame.data[2..])?;
         send_ack(&mut link);
         println!("Received: {receive_size:?}/{size:?}");
+        if progress.is_some() {
+            match progress.unwrap().send((receive_size, size)) {
+                Err(e) => println!("Error when logging progress: {e}"),
+                Ok(_) => (),
+            }
+        }
     }
     link.release();
     Ok(())
 }
 
-/// This function sends data using the DAT protocol
-pub fn send(file_name: &str, size: usize) {
+/// This function sends data using the DAT protocol, call this until there is no more data to send
+pub fn send(file_name: &str, size: usize, progress: Option<&Sender<(usize, usize)>>) {
     let file_content = read(&file_name).expect("Error in reading backup file!");
+    let mut send_size: usize = 0;
     if size != file_content.len() {
         panic!("Backup file does not match with memory size!");
     }
@@ -96,6 +104,13 @@ pub fn send(file_name: &str, size: usize) {
         let frame = Frame{proto: Protocol::DAT, data: chunk};
         link.send(frame);
         link.release();
+        send_size += chunk_size;
+        if progress.is_some() {
+            match progress.unwrap().send((send_size, chunk_size)) {
+                Err(e) => println!("Error when logging progress: {e}"),
+                Ok(_) => (),
+            }
+        }
         wait_ack();
     }
 }

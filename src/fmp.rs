@@ -4,6 +4,7 @@ use std::ffi::CStr;
 use std::fmt;
 use std::str;
 use text_colorizer::*;
+use std::sync::mpsc::Sender;
 
 use crate::link::Errno;
 use crate::link::Frame;
@@ -156,17 +157,17 @@ pub fn meminfo() -> Vec<MemInfo> {
 }
 
 /// Dump memory device into a file
-pub fn dump(mem_id: usize, mem: &MemInfo, file_name: &str) -> std::io::Result<()> {
+pub fn dump(mem_id: usize, mem: &MemInfo, file_name: &str, progress: Option<&Sender<(usize, usize)>>) -> std::io::Result<()> {
     // Send Dump FMP command then listen for incoming DAT transfer
     send_cmd(Opcode::DUMP, [[mem_id as u8].to_vec()].to_vec());
     wait_reply(Opcode::DUMP);
-    dat::receive(file_name, mem.size as usize)
+    dat::receive(file_name, mem.size as usize, progress)
 }
 
 /// Flash a given file into a particular memory device of a radio
-pub fn flash(mem_id: usize, mem: &MemInfo, file_name: &str) {
+pub fn flash(mem_id: usize, mem: &MemInfo, file_name: &str, progress: Option<&Sender<(usize, usize)>>) {
     // Send Fump FMP command then send content over DAT
     send_cmd(Opcode::FLASH, [[mem_id as u8].to_vec()].to_vec());
     wait_reply(Opcode::FLASH);
-    dat::send(file_name, mem.size as usize);
+    dat::send(file_name, mem.size as usize, progress);
 }
