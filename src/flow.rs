@@ -1,18 +1,16 @@
 use url::Url;
 use std::sync::mpsc::Sender;
+use std::env::current_dir;
 
 use crate::cat;
 use crate::fmp;
 
 pub fn backup(dest_path: Option<String>, progress: Option<&Sender<(usize, usize)>>) {
-    // Default path is .
+    // If it's a URI decode it to a path, default path is .
     let dest_path = match dest_path {
-        Some(x) => x,
-        _ => String::from("."),
+        Some(x) => Url::parse(&x).unwrap().to_file_path().unwrap(),
+        _ => current_dir().unwrap(),
     };
-    // If it's a URI decode it to a path
-    let dest_uri = Url::parse(&dest_path).unwrap();
-    let dest_path = dest_uri.to_file_path().unwrap();
     let radio_name = cat::info();
     // Enumerate all the memories, dump each in a separate file
     let mem_list = fmp::meminfo();
@@ -21,6 +19,7 @@ pub fn backup(dest_path: Option<String>, progress: Option<&Sender<(usize, usize)
     for (i, mem) in mem_list.iter().enumerate() {
         let mut file_name = String::new();
         file_name.push_str(dest_path.to_str().unwrap());
+        file_name.push_str("/");
         file_name.push_str(&radio_name);
         file_name.push_str("_");
         file_name.push_str(&mem.to_string());

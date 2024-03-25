@@ -69,7 +69,7 @@ pub fn receive(file_name: &str, size: usize, progress: Option<&Sender<(usize, us
         receive_size += frame.data.len() - 2;
         file.write_all(&frame.data[2..])?;
         send_ack(&mut link);
-        println!("Received: {receive_size:?}/{size:?}");
+        // println!("Received: {receive_size:?}/{size:?}");
         if progress.is_some() {
             match progress.unwrap().send((receive_size, size)) {
                 Err(e) => println!("Error when logging progress: {e}"),

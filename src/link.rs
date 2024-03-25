@@ -114,7 +114,7 @@ impl Link {
             assert!(!LINK.port.is_some(), "Serial port created more than once!");
             LINK = Link{port: Some(serialport::new(port, 115_200).timeout(Duration::from_millis(2000))
                                             .open()
-                                            .expect("Failed to open port"))};
+                                            .expect(&format!("Failed to open port {port}")))};
         }
     }
 
