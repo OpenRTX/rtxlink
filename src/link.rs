@@ -28,7 +28,7 @@ use serialport::SerialPort;
 use std::convert::TryFrom;
 use std::collections::VecDeque;
 use std::time::Duration;
-use std::io::ErrorKind;
+use std::io;
 use std::mem::replace;
 
 use crate::slip;
@@ -108,13 +108,15 @@ pub struct Link {
 
 impl Link {
     // This operation has to be performed only once, subsequent calls need to be get
-    pub fn new(port: &str) {
+    pub fn new(port: &str) -> io::Result<()> {
         // This is the serial port used for the rtxlink connection
         unsafe {
             assert!(!LINK.port.is_some(), "Serial port created more than once!");
-            LINK = Link{port: Some(serialport::new(port, 115_200).timeout(Duration::from_millis(2000))
-                                            .open()
-                                            .expect(&format!("Failed to open port {port}")))};
+            let serial_port = serialport::new(port, 115_200)
+                                         .timeout(Duration::from_millis(2000))
+                                         .open()?;
+            LINK = Link{port: Some(serial_port)};
+            Ok(())
         }
     }
 
@@ -144,7 +146,7 @@ impl Link {
 
     /// This function listens on the serial line for a frame, unwraps it,
     /// checks the CRC and returns it to the caller for dispatching.
-    pub fn receive(&mut self) -> Result<Frame, ErrorKind> {
+    pub fn receive(&mut self) -> Result<Frame, io::ErrorKind> {
         // Enqueue data until we get the first valid packet
         let mut decode_buffer = VecDeque::<u8>::new();
         let frames: Vec<Vec<u8>> = loop {
@@ -166,7 +168,7 @@ impl Link {
         // Check CRC16 using CCITT polynomial
         let digest = State::<AUG_CCITT>::calculate(&frames[0]);
         if digest != 0x0000 {
-            return Err(ErrorKind::InvalidData);
+            return Err(io::ErrorKind::InvalidData);
         }
         // Assign correct protocol
         let proto = Protocol::try_from(frames[0][0]).expect("Protocol not implemented!");
