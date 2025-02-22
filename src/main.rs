@@ -1,7 +1,7 @@
 use std::env;
 use std::process;
-use text_colorizer::*;
 use std::sync::mpsc::channel;
+use text_colorizer::*;
 
 mod cat;
 mod dat;
@@ -35,7 +35,7 @@ fn print_info() {
     for mem in mem_list {
         println!("[{}]: {:?}", i, mem);
         i += 1;
-    };
+    }
 }
 
 fn cli_backup(port: String) {
@@ -84,7 +84,9 @@ fn main() {
     let args: Vec<String> = env::args().collect();
 
     // Print usage information
-    if args.len() < 3 { print_usage(&args[0]); }
+    if args.len() < 3 {
+        print_usage(&args[0]);
+    }
 
     let serial_port = &args[1];
     let command = &args[2];
@@ -92,9 +94,18 @@ fn main() {
     let data_1 = env::args().nth(4);
 
     match &command as &str {
-        "info" => { link::Link::new(serial_port).expect("Error in opening serial port!"); print_info() },
-        "freqrx" => { link::Link::new(serial_port).expect("Error in opening serial port!"); cat::freq(data_0, false) },
-        "freqtx" => { link::Link::new(serial_port).expect("Error in opening serial port!"); cat::freq(data_0, true) },
+        "info" => {
+            link::Link::new(serial_port).expect("Error in opening serial port!");
+            print_info()
+        }
+        "freqrx" => {
+            link::Link::new(serial_port).expect("Error in opening serial port!");
+            cat::freq(data_0, false)
+        }
+        "freqtx" => {
+            link::Link::new(serial_port).expect("Error in opening serial port!");
+            cat::freq(data_0, true)
+        }
         "backup" => cli_backup(serial_port.clone()),
         "restore" => cli_restore(serial_port.clone(), data_0, data_1),
         _ => print_usage(&args[0]),

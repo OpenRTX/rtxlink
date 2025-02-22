@@ -9,7 +9,7 @@
 | END | ProtoID | Data | CRC8 | END |
 ```
 
-Following the leading END marker, the first byte of each frame is a protocol identifier describing the frame content, while the last byte of the frame contains the CRC-8 of the protocol ID and data fields. The polynomial used for the CRC is 0xA6, ensuring a minimum hamming distance of 2 for data blocks composed by more than 2048 bytes. 
+Following the leading END marker, the first byte of each frame is a protocol identifier describing the frame content, while the last byte of the frame contains the CRC-8 of the protocol ID and data fields. The polynomial used for the CRC is 0xA6, ensuring a minimum hamming distance of 2 for data blocks composed by more than 2048 bytes.
 
 The recognized protocol IDs are the following:
 
@@ -25,11 +25,11 @@ The recognized protocol IDs are the following:
 
 use crc16::*;
 use serialport::SerialPort;
-use std::convert::TryFrom;
 use std::collections::VecDeque;
-use std::time::Duration;
+use std::convert::TryFrom;
 use std::io;
 use std::mem::replace;
+use std::time::Duration;
 
 use crate::slip;
 
@@ -38,15 +38,15 @@ pub enum Protocol {
     STDIO = 0x00,
     CAT = 0x01,
     FMP = 0x02,
-    DAT = 0x03
+    DAT = 0x03,
 }
 
 /// POSIX Errors
 #[derive(Debug)]
 pub enum Errno {
-    OK      = 0,    // Success
-    E2BIG   = 7,    // Argument list too long
-    EBADR   = 53,   // Invalid request descriptor
+    OK = 0,         // Success
+    E2BIG = 7,      // Argument list too long
+    EBADR = 53,     // Invalid request descriptor
     EBADRQC = 56,   // Invalid request code
     EGENERIC = 255, // Generic error
 }
@@ -103,7 +103,7 @@ impl Frame {
 }
 
 pub struct Link {
-    port: Option<Box <dyn SerialPort>>,
+    port: Option<Box<dyn SerialPort>>,
 }
 
 impl Link {
@@ -113,17 +113,17 @@ impl Link {
         unsafe {
             assert!(!LINK.port.is_some(), "Serial port created more than once!");
             let serial_port = serialport::new(port, 115_200)
-                                         .timeout(Duration::from_millis(2000))
-                                         .open()?;
-            LINK = Link{port: Some(serial_port)};
+                .timeout(Duration::from_millis(2000))
+                .open()?;
+            LINK = Link {
+                port: Some(serial_port),
+            };
             Ok(())
         }
     }
 
     pub fn acquire() -> Link {
-        unsafe {
-            replace(&mut LINK, Link { port: None })
-        }
+        unsafe { replace(&mut LINK, Link { port: None }) }
     }
 
     pub fn release(self) {
@@ -141,7 +141,11 @@ impl Link {
         let encoded: Vec<u8> = slip::encode(&bin_frame);
         // Send frame down the serial port
         // println!("Tx: {:x?}", encoded);
-        self.port.as_mut().unwrap().write_all(encoded.as_slice()).expect("Error in sending frame");
+        self.port
+            .as_mut()
+            .unwrap()
+            .write_all(encoded.as_slice())
+            .expect("Error in sending frame");
     }
 
     /// This function listens on the serial line for a frame, unwraps it,
@@ -151,7 +155,12 @@ impl Link {
         let mut decode_buffer = VecDeque::<u8>::new();
         let frames: Vec<Vec<u8>> = loop {
             let mut receive_buffer: Vec<u8> = vec![0; 1024];
-            let nread = self.port.as_mut().unwrap().read(&mut receive_buffer).expect("Error during serial rx");
+            let nread = self
+                .port
+                .as_mut()
+                .unwrap()
+                .read(&mut receive_buffer)
+                .expect("Error during serial rx");
             for i in 0..nread {
                 decode_buffer.push_back(receive_buffer[i]);
             }
@@ -161,7 +170,7 @@ impl Link {
             let frames = slip::decode_frames(&mut decode_buffer).expect("Error in SLIP decode");
             // println!("Rx Frames: {:x?}", frames);
             if frames.len() > 0 {
-                break frames
+                break frames;
             }
         };
 
@@ -174,7 +183,10 @@ impl Link {
         let proto = Protocol::try_from(frames[0][0]).expect("Protocol not implemented!");
         // Trim proto (1 byte at beginning) and CRC (1 byte at end)
         let data = &frames[0][1..frames[0].len() - 2];
-        let frame = Frame {proto: proto, data: Vec::from(data)};
+        let frame = Frame {
+            proto: proto,
+            data: Vec::from(data),
+        };
         Ok(frame)
     }
 }

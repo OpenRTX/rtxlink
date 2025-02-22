@@ -1,10 +1,10 @@
 //! This module handles the Data Transfer Protocol portion of rtxlink
 
-use text_colorizer::*;
-use std::fs::{File, read};
+use std::fs::{read, File};
 use std::io::Write;
 use std::io::{Error, ErrorKind};
 use std::sync::mpsc::Sender;
+use text_colorizer::*;
 
 use crate::link::Errno;
 use crate::link::Frame;
@@ -16,7 +16,10 @@ const DAT_PAYLOAD_SIZE: usize = DAT_FRAME_SIZE - 2;
 
 /// This function sends an ACK to signal the correct reception of a DAT frame
 pub fn send_ack(link: &mut Link) {
-    let frame = Frame{proto: Protocol::DAT, data: vec![0x06]};
+    let frame = Frame {
+        proto: Protocol::DAT,
+        data: vec![0x06],
+    };
     link.send(frame);
 }
 
@@ -36,13 +39,21 @@ pub fn wait_ack() {
     let ack = frame.data[0];
     match ack {
         0x06 => (),
-        status => println!("{}: {:?}", "Error".bold().red(), Errno::try_from(status).unwrap()),
+        status => println!(
+            "{}: {:?}",
+            "Error".bold().red(),
+            Errno::try_from(status).unwrap()
+        ),
     }
     link.release();
 }
 
 /// This function receives data using the DAT protocol
-pub fn receive(file_name: &str, size: usize, progress: Option<&Sender<(usize, usize)>>) -> std::io::Result<()> {
+pub fn receive(
+    file_name: &str,
+    size: usize,
+    progress: Option<&Sender<(usize, usize)>>,
+) -> std::io::Result<()> {
     let mut receive_size: usize = 0;
     let mut prev_block: i16 = -1;
     let mut file = File::create(&file_name)?;
@@ -61,9 +72,11 @@ pub fn receive(file_name: &str, size: usize, progress: Option<&Sender<(usize, us
         // Check sanity of block number and its inverse
         let block_number = frame.data[0];
         let inv_block_number = frame.data[1];
-        if (block_number + inv_block_number != 255) ||
-           (block_number != (prev_block + 1) as u8) {
-            return Err(Error::new(ErrorKind::Other, "Error in DAT protocol receive: bad block indexing!"));
+        if (block_number + inv_block_number != 255) || (block_number != (prev_block + 1) as u8) {
+            return Err(Error::new(
+                ErrorKind::Other,
+                "Error in DAT protocol receive: bad block indexing!",
+            ));
         }
         prev_block = block_number as i16;
         receive_size += frame.data.len() - 2;
@@ -95,13 +108,20 @@ pub fn send(file_name: &str, size: usize, progress: Option<&Sender<(usize, usize
         chunk[0] = i as u8;
         chunk[1] = 255 - i as u8;
         let remaining_data: usize = size - (i - 1) * DAT_PAYLOAD_SIZE;
-        let chunk_size: usize = if remaining_data < DAT_PAYLOAD_SIZE {remaining_data} else {DAT_PAYLOAD_SIZE};
-        let start_offset = (i-1) * DAT_PAYLOAD_SIZE;
+        let chunk_size: usize = if remaining_data < DAT_PAYLOAD_SIZE {
+            remaining_data
+        } else {
+            DAT_PAYLOAD_SIZE
+        };
+        let start_offset = (i - 1) * DAT_PAYLOAD_SIZE;
         let end_offset = start_offset + chunk_size;
         chunk[2..chunk_size + 2].copy_from_slice(&file_content[start_offset..end_offset]);
         chunk.resize(chunk_size, 0);
         let mut link = Link::acquire();
-        let frame = Frame{proto: Protocol::DAT, data: chunk};
+        let frame = Frame {
+            proto: Protocol::DAT,
+            data: chunk,
+        };
         link.send(frame);
         link.release();
         send_size += chunk_size;

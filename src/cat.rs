@@ -10,10 +10,10 @@ use crate::link::Protocol;
 
 /// CAT Protocol opcodes
 enum Opcode {
-    GET  = 0x47, // G
-    SET  = 0x53, // S
+    GET = 0x47,  // G
+    SET = 0x53,  // S
     DATA = 0x44, // D
-    ACK  = 0x41, // A
+    ACK = 0x41,  // A
 }
 
 impl TryFrom<u8> for Opcode {
@@ -33,9 +33,9 @@ impl TryFrom<u8> for Opcode {
 /// CAT Protocol IDs
 #[derive(Copy, Clone)]
 enum ID {
-    INFO         = 0x494E, // IN
-    FREQRX       = 0x5246, // RF
-    FREQTX       = 0x5446, // TF
+    INFO = 0x494E,         // IN
+    FREQRX = 0x5246,       // RF
+    FREQTX = 0x5446,       // TF
     FILETRANSFER = 0x4654, // FT
 }
 
@@ -46,10 +46,15 @@ const HZ_IN_MHZ: f64 = 1000000.0;
 fn get(id: ID) -> Vec<u8> {
     let mut link = Link::acquire();
 
-    let cmd: Vec<u8> = vec![Opcode::GET as u8,
-                            ((id as u16 >> 8) & 0xff) as u8,
-                            (id as u16 & 0xff) as u8];
-    let frame = Frame{proto: Protocol::CAT, data: cmd};
+    let cmd: Vec<u8> = vec![
+        Opcode::GET as u8,
+        ((id as u16 >> 8) & 0xff) as u8,
+        (id as u16 & 0xff) as u8,
+    ];
+    let frame = Frame {
+        proto: Protocol::CAT,
+        data: cmd,
+    };
     link.send(frame);
 
     // Loop until we get a message of the right protocol
@@ -66,9 +71,15 @@ fn get(id: ID) -> Vec<u8> {
     match opcode {
         Opcode::ACK => match data[1] {
             0 => (),
-            status => println!("Error in GET request: {:?}", Errno::try_from(status).unwrap()),
+            status => println!(
+                "Error in GET request: {:?}",
+                Errno::try_from(status).unwrap()
+            ),
         }, // Error?
-        Opcode::DATA => { data.remove(0); () }, // Correct response!
+        Opcode::DATA => {
+            data.remove(0);
+            ()
+        } // Correct response!
         _ => panic!("Error while parsing GET response"),
     };
     link.release();
@@ -79,11 +90,16 @@ fn get(id: ID) -> Vec<u8> {
 fn set(id: ID, data: &[u8]) {
     let mut link = Link::acquire();
 
-    let mut cmd: Vec<u8> = vec![Opcode::SET as u8,
-                                ((id as u16 >> 8) & 0xff) as u8,
-                                (id as u16 & 0xff) as u8];
+    let mut cmd: Vec<u8> = vec![
+        Opcode::SET as u8,
+        ((id as u16 >> 8) & 0xff) as u8,
+        (id as u16 & 0xff) as u8,
+    ];
     cmd.extend(data);
-    let frame = Frame{proto: Protocol::CAT, data: cmd};
+    let frame = Frame {
+        proto: Protocol::CAT,
+        data: cmd,
+    };
     link.send(frame);
 
     let mut frame: Frame;
@@ -100,7 +116,10 @@ fn set(id: ID, data: &[u8]) {
     match opcode {
         Opcode::ACK => match data[1] {
             0 => (),
-            status => println!("Error in SET request: {:?}", Errno::try_from(status).unwrap()),
+            status => println!(
+                "Error in SET request: {:?}",
+                Errno::try_from(status).unwrap()
+            ),
         }, // Error?
         _ => panic!("Error while parsing SET response"),
     };
@@ -130,7 +149,7 @@ pub fn freq(data: Option<String>, is_tx: bool) {
                 true => println!("Tx: {freq} MHz"),
                 false => println!("Rx: {freq} MHz"),
             };
-        },
+        }
         // SET
         Some(data) => {
             let freq: f64 = data.parse::<f64>().unwrap();
@@ -138,7 +157,7 @@ pub fn freq(data: Option<String>, is_tx: bool) {
             let mut data: [u8; 4] = [0, 0, 0, 0];
             LittleEndian::write_u32(&mut data, freq);
             set(id, &data);
-        },
+        }
     };
 }
 

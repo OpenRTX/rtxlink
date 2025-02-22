@@ -22,7 +22,6 @@ pub fn encode(data: &[u8]) -> Vec<u8> {
             }
             _ => encoded_data.push(*byte),
         }
-
     }
 
     encoded_data.push(END);
@@ -66,11 +65,14 @@ pub fn decode_frames(data: &mut VecDeque<u8>) -> Result<Vec<Vec<u8>>> {
             }
             x => {
                 if escaped {
-                    return Err(Error::new(ErrorKind::InvalidData, "Invalid SLIP escape sequence"));
+                    return Err(Error::new(
+                        ErrorKind::InvalidData,
+                        "Invalid SLIP escape sequence",
+                    ));
                 }
                 if in_packet {
                     packet.push(x);
-                } 
+                }
             }
         }
     }

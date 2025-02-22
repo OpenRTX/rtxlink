@@ -1,6 +1,6 @@
-use url::Url;
-use std::sync::mpsc::Sender;
 use std::env::current_dir;
+use std::sync::mpsc::Sender;
+use url::Url;
 
 use crate::cat;
 use crate::fmp;
@@ -23,8 +23,7 @@ pub fn backup(dest_path: Option<String>, progress: Option<&Sender<(usize, usize)
         file_name.push_str(&radio_name);
         file_name.push_str("_");
         file_name.push_str(&mem.to_string());
-        file_name.push_str(&chrono::offset::Local::now().format("_%d%m%Y")
-                                                        .to_string());
+        file_name.push_str(&chrono::offset::Local::now().format("_%d%m%Y").to_string());
         file_name.push_str(".bin");
         match fmp::dump(i, &mem, &file_name, progress) {
             Err(why) => panic!("Error while storing backup on {}: {}", file_name, why),
@@ -33,11 +32,16 @@ pub fn backup(dest_path: Option<String>, progress: Option<&Sender<(usize, usize)
     }
 }
 
-pub fn restore(mem_index: Option<String>, src_path: Option<String>, progress: Option<&Sender<(usize, usize)>>) {
+pub fn restore(
+    mem_index: Option<String>,
+    src_path: Option<String>,
+    progress: Option<&Sender<(usize, usize)>>,
+) {
     // Parse parameters
-    let mem_index = mem_index.expect("Error: memory index not found!")
-                             .parse::<usize>()
-                             .expect("Error: invalid memory index!");
+    let mem_index = mem_index
+        .expect("Error: memory index not found!")
+        .parse::<usize>()
+        .expect("Error: invalid memory index!");
     let src_path = src_path.expect("Error: backup file not found!");
     let mem_list = fmp::meminfo();
     if mem_index > mem_list.len() {
